@@ -1,3 +1,8 @@
+
+/*
+这个版本所有标识符都不区分大小写
+*/
+
 #include "LexAla.h"
 #include <algorithm>
 #include <cctype>
@@ -9,9 +14,9 @@
 #include <string>
 #include <vector>
 #define DEBUG
+#define ERROR_HANDLAR
 //#define Lexout
 using namespace std;
-//static char now_ch = ' ';
 int integer_read;
 string str_read = "";
 string lower_str_read = "";
@@ -19,7 +24,8 @@ int line_num = 1; // line number
 symType now_type;
 map<string, symType> str2type;
 map<symType, string> type2str;
-vector<pair<symType, string>> lexRes;
+vector<SYM_INFO> lexRes;
+//vector<pair<symType, string>> lexRes;
 
 ostream &operator<<(ostream &ofs, symType st)
 {
@@ -57,6 +63,9 @@ void LexAnalyzer::get_sym()
         lower_str_read.push_back(tolower(now_ch));
         while (isalnum(now_ch = file_in.get()) || now_ch == '_')
             str_read.push_back(now_ch), lower_str_read.push_back(tolower(now_ch));
+        //-------------
+        str_read = lower_str_read;
+        //-------------
         auto it = str2type.find(lower_str_read);
         if (it == str2type.end())
             now_type = IDENFR;
@@ -142,6 +151,15 @@ void LexAnalyzer::get_nex_char()
 {
     str_read.clear();
     str_read.push_back(now_ch);
+
+    //-------------Error_handle
+
+    if (now_ch != '-' or now_ch != '+' or !isalnum(now_ch))
+    {
+        errHandle.add(line_num, ILLEGAL_CHAR);
+    }
+
+    //--------------------
     now_ch = file_in.get();
     now_type = CHARCON;
     //跳过下一个单引号
@@ -151,14 +169,25 @@ void LexAnalyzer::get_nex_char()
 void LexAnalyzer::get_nex_string()
 {
     str_read.clear();
-    str_read.push_back(now_ch);
     now_type = STRCON;
+    if (now_ch == '\"')
+    {
+        errHandle.add(line_num, ILLEGAL_CHAR);
+        goto out_get_string;
+    }
+    str_read.push_back(now_ch);
     while ((now_ch = file_in.get()) != '\"')
     {
         if (now_ch == EOF) //貌似没必要
             break;
+        if (!((now_ch >= 35 and now_ch <= 126) or now_ch == 32 or now_ch == 33))
+        {
+            errHandle.add(line_num, ILLEGAL_CHAR);
+        }
         str_read.push_back(now_ch);
     }
+
+out_get_string:
     now_ch = file_in.get(); //跳过下一个双引号
 }
 
@@ -237,7 +266,9 @@ void LexAnalyzer::OUT(int index)
 #ifdef DEBUG
     cout << temsym << ' ' << lexRes[index].second << endl;
 #endif
+#ifndef ERROR_HANDLAR
     file_out << temsym << ' ' << lexRes[index].second << endl;
+#endif
 }
 void LexAnalyzer::startAna()
 {
@@ -250,7 +281,7 @@ void LexAnalyzer::startAna()
 #ifdef Lexout
         OUT();
 #else
-        lexRes.push_back({now_type, str_read});
+        lexRes.push_back({now_type, str_read, line_num});
 #endif
         if (now_type == ILLEGAL)
         {
@@ -262,7 +293,7 @@ void LexAnalyzer::startAna()
 #ifdef Lexout
                 OUT();
 #else
-        lexRes.push_back({now_type, str_read});
+                lexRes.push_back({now_type, str_read, line_num});
 #endif
             }
             else if (str_read[0] == '\"')
@@ -272,7 +303,7 @@ void LexAnalyzer::startAna()
 #ifdef Lexout
                 OUT();
 #else
-        lexRes.push_back({now_type, str_read});
+                lexRes.push_back({now_type, str_read, line_num});
 #endif
             }
         }

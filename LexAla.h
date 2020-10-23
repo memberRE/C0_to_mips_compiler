@@ -1,12 +1,13 @@
 #include<fstream>
 #include<iostream>
 #include<string>
+#include "errorHandler.h"
 using namespace std;
 enum symType{
-    IDENFR,//��ʶ��
-    INTCON,//���� ��
-    CHARCON,//�ַ�����
-    STRCON,//�ַ���
+    IDENFR,
+    INTCON,
+    CHARCON,
+    STRCON,
     CONSTTK,//const
     INTTK,//int
     CHARTK,//char
@@ -48,7 +49,11 @@ enum symType{
     DOUQUO
 };
 
-
+struct SYM_INFO{
+    symType first;
+    string second;
+    int line_num;
+};
 
 class LexAnalyzer
 {
@@ -63,7 +68,8 @@ public:
     void OUT(int index);
     ifstream &file_in;
     ofstream &file_out;
-    LexAnalyzer (ifstream &ff_in,ofstream & ff_out) : file_in(ff_in),file_out(ff_out) {
+    errorInfo &errHandle;
+    LexAnalyzer (ifstream &ff_in,ofstream & ff_out,errorInfo & e) : file_in(ff_in),file_out(ff_out),errHandle(e) {
         initStr2Type();
         now_ch = file_in.get();
     }
