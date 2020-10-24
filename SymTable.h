@@ -31,7 +31,7 @@ public:
     bool has_ret;
     int addr;
     vector<TYPE_NAME> para_list; // 函数形参表
-    Symble_item(string name,IDENFR_TYPE iden_type,TYPE_NAME data_type): name(name),iden_type(iden_type),data_type(date_type)
+    Symble_item(string name,IDENFR_TYPE iden_type,TYPE_NAME data_type): name(name),iden_type(iden_type),data_type(data_type)
     {
         if (iden_type == FUNC)
             has_ret = 1;

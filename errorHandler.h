@@ -3,7 +3,7 @@
 #include <vector>
 using namespace std;
 
-enum ERROR_TYPE
+enum ERROR_TYPE__
 {
     ILLEGAL_CHAR,
     NAME_REDEF,
@@ -26,11 +26,11 @@ enum ERROR_TYPE
 class errorInfo
 {
 public:
-    vector<pair<int,ERROR_TYPE>> errorSet;
+    vector<pair<int,ERROR_TYPE__>> errorSet;
     ofstream &file_out;
     void initErr2Char();
     void OUTALL();
-    void add(int line_num, ERROR_TYPE e);
+    void add(int line_num, ERROR_TYPE__ e);
     errorInfo(ofstream &ff_out) : file_out(ff_out)
     {
         initErr2Char();

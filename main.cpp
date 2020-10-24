@@ -2,7 +2,6 @@
 #include <fstream>
 #include <string>
 #include <algorithm>
-#include "errorHandler.h"
 #include "GrammaAna.h"
 using namespace std;
 int main()

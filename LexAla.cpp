@@ -150,17 +150,24 @@ void LexAnalyzer::get_sym()
 void LexAnalyzer::get_nex_char()
 {
     str_read.clear();
+    if (now_ch == '\'')
+    {
+        errHandle.add(line_num, ILLEGAL_CHAR);
+        goto out_funccc;
+    }
+        
     str_read.push_back(now_ch);
 
     //-------------Error_handle
 
-    if (now_ch != '-' or now_ch != '+' or !isalnum(now_ch))
+    if (now_ch != '_' and now_ch != '*' and now_ch != '/' and now_ch != '-' and now_ch != '+' and !isalnum(now_ch))
     {
         errHandle.add(line_num, ILLEGAL_CHAR);
     }
 
     //--------------------
     now_ch = file_in.get();
+out_funccc:
     now_type = CHARCON;
     //跳过下一个单引号
     now_ch = file_in.get();

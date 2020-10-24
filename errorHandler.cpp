@@ -1,4 +1,3 @@
-#include "errorHandler.h"
 #include "LexAla.h"
 #include <algorithm>
 #include <map>
@@ -8,7 +7,7 @@ using namespace std;
 
 map<int, char> err2Char;
 
-ostream &operator<<(ostream &ofs, ERROR_TYPE st)
+ostream &operator<<(ostream &ofs, ERROR_TYPE__ st)
 {
     ofs << err2Char[st];
     return ofs;
@@ -37,7 +36,7 @@ void errorInfo::initErr2Char()
 void errorInfo::OUTALL()
 {
     sort(errorSet.begin(), errorSet.end());
-    for (pair<int, ERROR_TYPE> T : errorSet)
+    for (pair<int, ERROR_TYPE__> T : errorSet)
     {
 #ifdef DEBUG
         cout << T.first << ' ' << T.second << endl;
@@ -48,7 +47,15 @@ void errorInfo::OUTALL()
     }
 }
 
-void errorInfo::add(int line_num, ERROR_TYPE e)
+void errorInfo::add(int line_num, ERROR_TYPE__ e)
 {
+    if (errorSet.size() != 0)
+    {
+        int temline = errorSet[errorSet.size() - 1].first;
+        ERROR_TYPE__ teme = errorSet[errorSet.size() - 1].second;
+        if (temline == line_num and e == teme)
+            return;
+    }
+
     errorSet.push_back({line_num, e});
 }

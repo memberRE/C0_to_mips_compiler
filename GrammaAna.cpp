@@ -70,7 +70,7 @@ int out_index = 0;              //out_index指向下一个需要输出的sym
     else if (id_sym == NOW_SYMTAB.end())                                \
         if_found = 0;                                                   \
     if (if_found == 0)                                                  \
-        add_error(LAS_LINENUM, NAME_NODEF);
+        add_error(NOWLINE, NAME_NODEF);
 
 #define IDENFR_EXIST_CONST_CHECK                                        \
     Symble_item tem_sym = Symble_item(NOWSTR, VAR, INT);                \
@@ -85,15 +85,15 @@ int out_index = 0;              //out_index指向下一个需要输出的sym
     else if (id_sym == NOW_SYMTAB.end())                                \
         if_found = 0;                                                   \
     if (if_found == 0)                                                  \
-        add_error(LAS_LINENUM, NAME_NODEF);                             \
+        add_error(NOWLINE, NAME_NODEF);                             \
     else if (id_sym->iden_type == CONSTT)                               \
-        add_error(LAS_LINENUM, CONST_WRI_ERR);
+        add_error(NOWLINE, CONST_WRI_ERR);
 
 inline int toInt(string &str)
 {
     int x = 0;
     if (str.size() == 1)
-        return (int)str[0];
+        return (NOWSYM == CHARCON)?str[0]:(int)str[0] - '0';
     else
         for (int i = 0; i < str.size(); i++)
         {
@@ -271,7 +271,7 @@ bool GrammaAna::var_init_def(int firType, int dataType) // 0 int ,1 char
         int get_type = const_check();
         if (get_type != dataType)
         {
-            add_error(LAS_LINENUM, TYPE_NOT_MATCH);
+            add_error(NOWLINE, TYPE_NOT_MATCH);
         }
     }
     else if (firType == 2) //一维数组
@@ -289,7 +289,7 @@ bool GrammaAna::var_init_def(int firType, int dataType) // 0 int ,1 char
             arr_1d_num++;
             if (get_type != dataType)
             {
-                add_error(LAS_LINENUM, TYPE_NOT_MATCH);
+                add_error(NOWLINE, TYPE_NOT_MATCH);
             }
         } while (NOWSYM == COMMA);
         if (NOWSYM != RBRACE) //{
@@ -299,7 +299,7 @@ bool GrammaAna::var_init_def(int firType, int dataType) // 0 int ,1 char
         }
         if (arr_1d_num != arr_dime[0])
         {
-            add_error(LAS_LINENUM, ARRAY_INIT_ERR);
+            add_error(NOWLINE, ARRAY_INIT_ERR);
         }
         sym_index++;
     }
@@ -328,7 +328,7 @@ bool GrammaAna::var_init_def(int firType, int dataType) // 0 int ,1 char
                 int get_type = const_check();
                 if (get_type != dataType)
                 {
-                    add_error(LAS_LINENUM, TYPE_NOT_MATCH);
+                    add_error(NOWLINE, TYPE_NOT_MATCH);
                 }
             } while (NOWSYM == COMMA);
             if (NOWSYM != RBRACE) //}
@@ -338,7 +338,7 @@ bool GrammaAna::var_init_def(int firType, int dataType) // 0 int ,1 char
             }
             if (arr_2d_num != arr_dime[1])
             {
-                add_error(LAS_LINENUM, ARRAY_INIT_ERR);
+                add_error(NOWLINE, ARRAY_INIT_ERR);
             }
             sym_index++;
         } while (NOWSYM == COMMA);
@@ -349,7 +349,7 @@ bool GrammaAna::var_init_def(int firType, int dataType) // 0 int ,1 char
         }
         if (arr_1d_num != arr_dime[0])
         {
-            add_error(LAS_LINENUM, ARRAY_INIT_ERR);
+            add_error(NOWLINE, ARRAY_INIT_ERR);
         }
         sym_index++;
     }
@@ -407,7 +407,7 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
         sym_index += 2;
         if (NOWSYM != INTCON)
         {
-            add_error(LAS_LINENUM, INDEX_ERR);
+            add_error(NOWLINE, INDEX_ERR);
         }
         else
         {
@@ -416,7 +416,7 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
         sym_index++;
         if (NOWSYM != RBRACK)
         {
-            add_error(LAS_LINENUM, NO_RBRACK);
+            add_error(NOWLINE, NO_RBRACK);
             sym_index--; // 为了不用改下面的sym_index+2;
         }
         GRAOUT;
@@ -427,7 +427,7 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
         sym_index += 2;
         if (NOWSYM != INTCON)
         {
-            add_error(LAS_LINENUM, INDEX_ERR);
+            add_error(NOWLINE, INDEX_ERR);
         }
         else
         {
@@ -441,7 +441,7 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
 #endif
         if (NOWSYM != RBRACK) // no ]
         {
-            add_error(LAS_LINENUM, NO_RBRACK);
+            add_error(NOWLINE, NO_RBRACK);
         }
         else
             sym_index++;
@@ -462,7 +462,7 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
         sym_index += 2;
         if (NOWSYM != INTCON)
         {
-            add_error(LAS_LINENUM, INDEX_ERR);
+            add_error(NOWLINE, INDEX_ERR);
         }
         else
         {
@@ -476,7 +476,7 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
 #endif
         if (NOWSYM != RBRACK)
         {
-            add_error(LAS_LINENUM, NO_RBRACK);
+            add_error(NOWLINE, NO_RBRACK);
         }
         else
             sym_index++;
@@ -563,7 +563,7 @@ bool GrammaAna::var_statment() // succ
         }
         else
             sym_index++;
-    } while (lexRes[sym_index + 2].first != LPARENT and (NOWSYM == INTTK or NOWSYM == CHARTK) and PEEKSYM(1) == IDENFR);
+    } while (/*lexRes[sym_index + 2].first != LPARENT*/ PEEKSYM(2) != LPARENT and (NOWSYM == INTTK or NOWSYM == CHARTK) and PEEKSYM(1) == IDENFR);
     GRAOUT;
     cout << "<变量说明>" << endl;
 #ifndef ERROR_HANDLAR
@@ -654,7 +654,7 @@ bool GrammaAna::condition_check()
     typee = expre_check();
     if (typee == 2)
     {
-        add_error(LAS_LINENUM, CONDITION_TYPE_ERR);
+        add_error(NOWLINE, CONDITION_TYPE_ERR);
     }
 
     if (!(NOWSYM == LSS or NOWSYM == LEQ or NOWSYM == GRE or NOWSYM == GEQ or NOWSYM == EQL or NOWSYM == NEQ))
@@ -666,7 +666,7 @@ bool GrammaAna::condition_check()
     typee = expre_check();
     if (typee == 2)
     {
-        add_error(LAS_LINENUM, CONDITION_TYPE_ERR);
+        add_error(NOWLINE, CONDITION_TYPE_ERR);
     }
     GRAOUT;
     cout << "<条件>" << endl;
@@ -751,7 +751,7 @@ int GrammaAna::factor_check()
         typee = expre_check();
         if (NOWSYM != RPARENT) // )
         {
-            add_error(LAS_LINENUM, NO_RPARENT);
+            add_error(NOWLINE, NO_RPARENT);
         }
         else
             sym_index++;
@@ -779,7 +779,10 @@ int GrammaAna::factor_check()
                 if_findd = 0;
         }
         if (if_findd == 0)
+        {
             typee = -1;
+            add_error(NOWLINE, NAME_NODEF);
+        }
         else
             typee = id_sym->data_type == INT ? 1 : 2;
         if (NOWSYM == LBRACK) // [
@@ -788,11 +791,11 @@ int GrammaAna::factor_check()
             int tem_typee = expre_check();
             if (tem_typee == 2) //即不是未定义和int，是char
             {
-                add_error(LAS_LINENUM, INDEX_ERR);
+                add_error(NOWLINE, INDEX_ERR);
             }
             if (NOWSYM != RBRACK)
             {
-                add_error(LAS_LINENUM, NO_RBRACK);
+                add_error(NOWLINE, NO_RBRACK);
             }
             else
                 sym_index++;
@@ -802,11 +805,11 @@ int GrammaAna::factor_check()
                 tem_typee = expre_check();
                 if (tem_typee == 2) //即不是未定义和int，是char
                 {
-                    add_error(LAS_LINENUM, INDEX_ERR);
+                    add_error(NOWLINE, INDEX_ERR);
                 }
                 if (NOWSYM != RBRACK)
                 {
-                    add_error(LAS_LINENUM, NO_RBRACK);
+                    add_error(NOWLINE, NO_RBRACK);
                 }
                 else
                     sym_index++;
@@ -850,7 +853,7 @@ bool GrammaAna::whileFor_check()
         condition_check();
         if (NOWSYM != RPARENT)
         {
-            add_error(LAS_LINENUM, NO_RPARENT);
+            add_error(NOWLINE, NO_RPARENT);
         }
         else
             sym_index++;
@@ -879,11 +882,11 @@ bool GrammaAna::whileFor_check()
 
         if (if_found == 0)
         {
-            add_error(LAS_LINENUM, NAME_NODEF);
+            add_error(NOWLINE, NAME_NODEF);
         }
         else if (id_sym->iden_type == CONSTT)
         {
-            add_error(LAS_LINENUM, CONST_WRI_ERR);
+            add_error(NOWLINE, CONST_WRI_ERR);
         }
 
         sym_index++;
@@ -923,11 +926,11 @@ bool GrammaAna::whileFor_check()
 
         if (if_found == 0)
         {
-            add_error(LAS_LINENUM, NAME_NODEF);
+            add_error(NOWLINE, NAME_NODEF);
         }
         else if (id_sym->iden_type == CONSTT)
         {
-            add_error(LAS_LINENUM, CONST_WRI_ERR);
+            add_error(NOWLINE, CONST_WRI_ERR);
         }
         //---------------------------------------------------
         sym_index++;
@@ -951,7 +954,7 @@ bool GrammaAna::whileFor_check()
 
         if (if_found == 0)
         {
-            add_error(LAS_LINENUM, NAME_NODEF);
+            add_error(NOWLINE, NAME_NODEF);
         }
         //---------------------------------------------------
         sym_index++;
@@ -963,7 +966,7 @@ bool GrammaAna::whileFor_check()
 
         if (NOWSYM != RPARENT)
         {
-            add_error(LAS_LINENUM, NO_RPARENT);
+            add_error(NOWLINE, NO_RPARENT);
         }
         else
             sym_index++;
@@ -1003,7 +1006,7 @@ bool GrammaAna::if_check()
 
     if (NOWSYM != RPARENT)
     {
-        add_error(LAS_LINENUM, NO_RPARENT);
+        add_error(NOWLINE, NO_RPARENT);
     }
     else
         sym_index++;
@@ -1053,7 +1056,7 @@ bool GrammaAna::scanf_check()
     sym_index++;
     if (NOWSYM != RPARENT)
     {
-        add_error(LAS_LINENUM, NO_RPARENT);
+        add_error(NOWLINE, NO_RPARENT);
     }
     else
         sym_index++;
@@ -1108,7 +1111,7 @@ bool GrammaAna::printf_check()
     }
     if (NOWSYM != RPARENT)
     {
-        add_error(LAS_LINENUM, NO_RPARENT);
+        add_error(NOWLINE, NO_RPARENT);
     }
     else
         sym_index++;
@@ -1140,18 +1143,18 @@ bool GrammaAna::ret_check(int flag)
         sym_index++;
         if (NOWSYM == RPARENT) //确保表达式不为空
         {
-            add_error(LAS_LINENUM, need_ret_type == 0 ? NORET_FUNC_ERR : RET_FUNC_ERR);
+            add_error(NOWLINE, need_ret_type == 0 ? NORET_FUNC_ERR : RET_FUNC_ERR);
             sym_index++;
             return 1;
         }
         int temtype = expre_check();
         if (temtype != need_ret_type and temtype != -1)
         {
-            add_error(LAS_LINENUM, need_ret_type == 0 ? NORET_FUNC_ERR : RET_FUNC_ERR);
+            add_error(NOWLINE, need_ret_type == 0 ? NORET_FUNC_ERR : RET_FUNC_ERR);
         }
         if (NOWSYM != RPARENT)
         {
-            add_error(LAS_LINENUM, NO_RPARENT);
+            add_error(NOWLINE, NO_RPARENT);
         }
         else
             sym_index++;
@@ -1159,7 +1162,7 @@ bool GrammaAna::ret_check(int flag)
     else //return为空的时候
     {
         if (need_ret_type != 0)
-            add_error(LAS_LINENUM, RET_FUNC_ERR);
+            add_error(NOWLINE, RET_FUNC_ERR);
     }
     GRAOUT;
     cout << "<返回语句>" << endl;
@@ -1231,7 +1234,7 @@ bool GrammaAna::sub_condition(int type)
     int temtype = const_check() + 1;
     if (type != -1 and temtype != type)
     {
-        add_error(LAS_LINENUM, TYPE_NOT_MATCH);
+        add_error(NOWLINE, TYPE_NOT_MATCH);
     }
     if (NOWSYM != COLON)
     {
@@ -1273,7 +1276,7 @@ bool GrammaAna::switch_check()
 
     if (NOWSYM != RPARENT)
     {
-        add_error(LAS_LINENUM, NO_RPARENT);
+        add_error(NOWLINE, NO_RPARENT);
     }
     else
         sym_index++;
@@ -1331,7 +1334,7 @@ bool GrammaAna::callFuncNoRet_check()
 
     if (NOWSYM != RPARENT)
     {
-        add_error(LAS_LINENUM, NO_RPARENT);
+        add_error(NOWLINE, NO_RPARENT);
     }
     else
         sym_index++;
@@ -1370,7 +1373,7 @@ int GrammaAna::callFuncRet_check()
 
     if (NOWSYM != RPARENT)
     {
-        add_error(LAS_LINENUM, NO_RPARENT);
+        add_error(NOWLINE, NO_RPARENT);
     }
     else
         sym_index++;
@@ -1392,7 +1395,7 @@ bool GrammaAna::value_para_list(vector<TYPE_NAME> &real_para)
     {
         if (real_para.size() != 0)
         {
-            add_error(LAS_LINENUM, PARA_NUM_NOT_MATCH);
+            add_error(NOWLINE, PARA_NUM_NOT_MATCH);
         }
         GRAOUT;
         cout << "<值参数表>" << endl;
@@ -1405,11 +1408,11 @@ bool GrammaAna::value_para_list(vector<TYPE_NAME> &real_para)
     typee = expre_check();
     if (para_num > limit_num)
     {
-        add_error(LAS_LINENUM, PARA_NUM_NOT_MATCH);
+        add_error(NOWLINE, PARA_NUM_NOT_MATCH);
     }
     else if (typee != -1 and typee != (real_para[para_num - 1] == INT ? 1 : 2))
     {
-        add_error(LAS_LINENUM, PARA_TYPE_NOT_MATCH);
+        add_error(NOWLINE, PARA_TYPE_NOT_MATCH);
     }
 
     while (NOWSYM == COMMA)
@@ -1419,11 +1422,11 @@ bool GrammaAna::value_para_list(vector<TYPE_NAME> &real_para)
         para_num++;
         if (para_num > limit_num)
         {
-            add_error(LAS_LINENUM, PARA_NUM_NOT_MATCH);
+            add_error(NOWLINE, PARA_NUM_NOT_MATCH);
         }
         else if (typee != -1 and typee != (real_para[para_num - 1] == INT ? 1 : 2))
         {
-            add_error(LAS_LINENUM, PARA_TYPE_NOT_MATCH);
+            add_error(NOWLINE, PARA_TYPE_NOT_MATCH);
         }
     }
 
@@ -1451,9 +1454,8 @@ bool GrammaAna::assign_check()
 
     if (NOWSYM != IDENFR)
         ERROR_
-    sym_index++;
-
     IDENFR_EXIST_CONST_CHECK
+    sym_index++;
 
     if (NOWSYM == ASSIGN) //变量
     {
@@ -1467,7 +1469,7 @@ bool GrammaAna::assign_check()
         typee = expre_check();
         if (typee == 2)
         {
-            add_error(LAS_LINENUM, INDEX_ERR);
+            add_error(NOWLINE, INDEX_ERR);
         }
         if (NOWSYM != RBRACK)
         {
@@ -1486,7 +1488,7 @@ bool GrammaAna::assign_check()
             typee = expre_check();
             if (typee == 2)
             {
-                add_error(LAS_LINENUM, INDEX_ERR);
+                add_error(NOWLINE, INDEX_ERR);
             }
             if (NOWSYM != RBRACK)
             {
@@ -1569,12 +1571,20 @@ int GrammaAna::sentence_check(int flag)
     {
         sym_index++;
         sentence_list(flag);
+        if (NOWSYM != RBRACE)
+        {
+            cout << "Error in func sectence_check" << endl;
+            return 0;
+        }
+        sym_index++;
+        /*
         if (NOWSYM != SEMICN)
         {
-            add_error(LAS_LINENUM, NO_SEM);
+            add_error(NOWLINE, NO_SEM);
         }
         else
             sym_index++;
+        */
     }
     else if (NOWSYM == SEMICN) //空语句
         sym_index++;
@@ -1650,6 +1660,7 @@ bool GrammaAna::func_noRet_define()
 {
     ret_in_func = 0;
     need_ret_type = 0;
+    int name_line = 0;
     if (NOWSYM != VOIDTK)
     {
         cout << "Error in func func_noRet_def" << endl;
@@ -1661,6 +1672,7 @@ bool GrammaAna::func_noRet_define()
         cout << "Error in func func_noRet_def" << endl;
         return 0;
     }
+    name_line = NOWLINE;
     Symble_item tem_sym = Symble_item(NOWSTR, FUNC_NO_RET, VOID);
     noRetFunc_symSet.insert(NOWSTR);
     sym_index++;
@@ -1677,7 +1689,7 @@ bool GrammaAna::func_noRet_define()
     if (NOWSYM != RPARENT)
     {
         cout << "Error in func func_noRet_def" << endl;
-        add_error(LAS_LINENUM, NO_RPARENT);
+        add_error(NOWLINE, NO_RPARENT);
     }
     else
         sym_index++;
@@ -1686,7 +1698,7 @@ bool GrammaAna::func_noRet_define()
     if (sym_table_stk[sym_table_stk.size() - 2].find(tem_sym) != sym_table_stk[sym_table_stk.size() - 2].end())
     {
         cout << "redef" << endl;
-        add_error(LAS_LINENUM, NAME_REDEF);
+        add_error(name_line, NAME_REDEF);
     }
     else
         sym_table_stk[sym_table_stk.size() - 2].insert(tem_sym);
@@ -1748,9 +1760,11 @@ bool GrammaAna::func_define()
 {
     ret_in_func = 0;
     need_ret_type = 0;
+    int name_line = 0;
     int typee = NOWSYM == INTTK ? 1 : 2;
     need_ret_type = typee;
     sym_index++;
+    name_line = NOWLINE;
     Symble_item tem_sym = Symble_item(NOWSTR, FUNC, typee == 1 ? INT : CHAR);
     sym_index--;
     statment_head();
@@ -1767,7 +1781,7 @@ bool GrammaAna::func_define()
     if (NOWSYM != RPARENT)
     {
         cout << "Error in func func_def" << endl;
-        add_error(LAS_LINENUM, NO_RPARENT);
+        add_error(NOWLINE, NO_RPARENT);
     }
     else
         sym_index++;
@@ -1776,7 +1790,7 @@ bool GrammaAna::func_define()
     if (sym_table_stk[sym_table_stk.size() - 2].find(tem_sym) != sym_table_stk[sym_table_stk.size() - 2].end())
     {
         cout << "redef" << endl;
-        add_error(LAS_LINENUM, NAME_REDEF);
+        add_error(name_line, NAME_REDEF);
     }
     else
         sym_table_stk[sym_table_stk.size() - 2].insert(tem_sym);
@@ -1787,6 +1801,10 @@ bool GrammaAna::func_define()
     }
     sym_index++;
     mult_sentence(0); // 复合语句
+    if (ret_in_func == 0)
+    {
+        add_error(NOWLINE, RET_FUNC_ERR);
+    }
     if (NOWSYM != RBRACE)
     {
         cout << "Error in func func_def" << endl;
@@ -1795,10 +1813,7 @@ bool GrammaAna::func_define()
     sym_index++;
     POP_SYMSTK;
 
-    if (ret_in_func == 0)
-    {
-        add_error(NOWLINE, RET_FUNC_ERR);
-    }
+    
 
     GRAOUT;
     cout << "<有返回值函数定义>" << endl;
@@ -1889,7 +1904,7 @@ bool GrammaAna::top_programe()
             else
                 func_noRet_define();
         }
-        if (NOWSYM == INTTK || NOWSYM == CHARTK)
+        else if (NOWSYM == INTTK || NOWSYM == CHARTK)
             func_define();
         else
         {
@@ -1920,7 +1935,7 @@ void GrammaAna::startGramAna()
     lex_ana.errHandle.OUTALL();
 }
 
-void GrammaAna::add_error(int line_num, ERROR_TYPE e)
+void GrammaAna::add_error(int line_num, ERROR_TYPE__ e)
 {
     lex_ana.errHandle.add(line_num, e);
 }

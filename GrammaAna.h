@@ -16,7 +16,7 @@ public:
     LexAnalyzer &lex_ana;
     GrammaAna(ifstream &ff_in, ofstream &ff_out, LexAnalyzer &lex) : file_in(ff_in), file_out(ff_out), lex_ana(lex) {}
 private:
-    void add_error(int line_num,ERROR_TYPE e);
+    void add_error(int line_num,ERROR_TYPE__ e);
     bool top_programe();    //顶层程序
     bool const_define();    //常量定义
     int const_check();//对应语法中的<常量> ::= <整数>|<字符>
