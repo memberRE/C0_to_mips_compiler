@@ -69,7 +69,7 @@ private:
     bool condition_table(int type); // <情况表>
     bool default_check();
     bool sub_condition(int type);
-    bool value_para_list(vector<TYPE_NAME> & real_para); // <值参数表>
+    bool value_para_list(const vector<TYPE_NAME> & real_para); // <值参数表>
     //succ
     bool statment_head();// <声明头部>
 };

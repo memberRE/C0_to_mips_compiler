@@ -1329,8 +1329,8 @@ bool GrammaAna::callFuncNoRet_check()
         cout << "Error in Func_call no '(' " << endl;
     }
     sym_index++;
-    vector<TYPE_NAME> tem = id_sym->para_list;
-    value_para_list(tem);
+    //vector<TYPE_NAME> tem = id_sym->para_list;
+    value_para_list(id_sym->para_list);
 
     if (NOWSYM != RPARENT)
     {
@@ -1388,7 +1388,7 @@ int GrammaAna::callFuncRet_check()
 /*
 ＜值参数表＞   ::= ＜表达式＞{,＜表达式＞}｜＜空＞   
 */
-bool GrammaAna::value_para_list(vector<TYPE_NAME> &real_para)
+bool GrammaAna::value_para_list(const vector<TYPE_NAME> &real_para)
 {
     //参数表为空的几种可能情况，由于可能缺少右括号，情况变复杂了
     if (NOWSYM == RPARENT or NOWSYM == SEMICN or NOWSYM == MULT or NOWSYM == DIV)
