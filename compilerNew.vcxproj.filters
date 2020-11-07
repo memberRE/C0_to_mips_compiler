@@ -27,6 +27,12 @@
     <ClCompile Include="errorHandler.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="mips.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="instructions.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GrammaAna.h">
@@ -39,6 +45,15 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="errorHandler.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="mips.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="instructions.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inter.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

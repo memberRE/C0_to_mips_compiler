@@ -22,7 +22,7 @@ private:
     int const_check();//对应语法中的<常量> ::= <整数>|<字符>
     bool var_define();  //变量定义
     // succ
-    bool var_init_def(int firType,int dataType);
+    bool var_init_def(int firType,int dataType,string iden_name);
     bool var_noInit_def(int firType,int dataType);
     bool var_statment();    //变量说明
     //succ

@@ -143,13 +143,18 @@
   <ItemGroup>
     <ClCompile Include="errorHandler.cpp" />
     <ClCompile Include="GrammaAna.cpp" />
+    <ClCompile Include="instructions.cpp" />
     <ClCompile Include="LexAla.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="mips.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="errorHandler.h" />
     <ClInclude Include="GrammaAna.h" />
+    <ClInclude Include="instructions.h" />
+    <ClInclude Include="Inter.h" />
     <ClInclude Include="LexAla.h" />
+    <ClInclude Include="mips.h" />
     <ClInclude Include="SymTable.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,6 +1,9 @@
 #include "GrammaAna.h"
+#include "Inter.h"
 #include <map>
 #include <set>
+#include <string>
+#include <utility>
 #include <vector>
 #include <wchar.h>
 #define ERROR_HANDLAR
@@ -19,6 +22,15 @@ int ret_in_func = 0; // 在函数定义的里面是否有返回语句
 int need_ret_type = 0;
 vector<symType> sym_stk;
 vector<set<Symble_item>> sym_table_stk; // 符号表
+vector<RUN_TAB> running_symtable;       // 中间代码转化成mips的时候用的符号表，上面那个符号表被弹出之后就放进这个里面。
+int now_addr_offset;             //记录当前符号表地址分配的offset
+int str_const_num = 0;                  //记录有多少字符串常量
+vector<string> str_const;               //记录这些字符串常量是什么
+string res_iden;                        //给表达式，因子，项函数用的返回值，保存了结果在哪个标识符。
+int tem_var_num = 0;                    //临时变量到了第多少个
+
+vector<Inter> interCode; //中间代码
+
 set<string> noRetFunc_symSet;
 int sym_top = 0, sym_index = 0; //sym_index指向第一个未处理的sym
 int out_index = 0;              //out_index指向下一个需要输出的sym
@@ -85,15 +97,24 @@ int out_index = 0;              //out_index指向下一个需要输出的sym
     else if (id_sym == NOW_SYMTAB.end())                                \
         if_found = 0;                                                   \
     if (if_found == 0)                                                  \
-        add_error(NOWLINE, NAME_NODEF);                             \
+        add_error(NOWLINE, NAME_NODEF);                                 \
     else if (id_sym->iden_type == CONSTT)                               \
         add_error(NOWLINE, CONST_WRI_ERR);
 
+string get_temvar()
+{
+    string tem_name = "#" + to_string(tem_var_num++);
+    Symble_item tem = Symble_item(tem_name, VAR, INT);
+    tem.gen_addr();
+    NOW_SYMTAB.insert(tem);
+    return tem_name;
+}
+//如果str是单个字母，返回其asc，否则返回这个字符串代表的数字
 inline int toInt(string &str)
 {
     int x = 0;
     if (str.size() == 1)
-        return (NOWSYM == CHARCON)?str[0]:(int)str[0] - '0';
+        return (NOWSYM == CHARCON) ? str[0] : (int)str[0] - '0';
     else
         for (int i = 0; i < str.size(); i++)
         {
@@ -139,6 +160,8 @@ int GrammaAna::integer_check()
 /*
 ＜常量定义＞::=int＜标识符＞＝＜整数＞{,＜标识符＞＝＜整数＞}  | char＜标识符＞＝＜字符＞{,＜标识符＞＝＜字符＞} 
 */
+// 11.6,21:06 给常数定义增加了地址分配(等等，常量貌似不需要分配地址，直接常数替换好了，，，)
+// 11.6,21:07 注释掉了常数地址分配
 bool GrammaAna::const_def() // finish
 {
     int flag = NOWSYM == INTTK ? 1 : 2;
@@ -160,6 +183,8 @@ bool GrammaAna::const_def() // finish
         }
         tem_line_num = NOWLINE;
         Symble_item tem_idenfr = Symble_item(NOWSTR, CONSTT, flag == 1 ? INT : CHAR);
+        // tem_idenfr.addr = now_addr_offset;
+        // now_addr_offset+=4;
         sym_index++;
         if (NOWSYM != ASSIGN)
         {
@@ -264,10 +289,13 @@ int GrammaAna::const_check()
     ＜类型标识符＞＜标识符＞'['＜无符号整数＞']'='{'＜常量＞{,＜常量＞}'}' |
     ＜类型标识符＞＜标识符＞'['＜无符号整数＞']''['＜无符号整数＞']'='{''{'＜常量＞{,＜常量＞}'}'{, '{'＜常量＞{,＜常量＞}'}'}'}'
 */
-bool GrammaAna::var_init_def(int firType, int dataType) // 0 int ,1 char
+// 11.06 增加了变量的初始化的四元式输出
+bool GrammaAna::var_init_def(int firType, int dataType, string iden_name) // 0 int ,1 char
 {
     if (firType == 1) //变量
     {
+        int val = toInt(NOWSTR);
+        interCode.emplace_back("=_const", to_string(val), "", iden_name);
         int get_type = const_check();
         if (get_type != dataType)
         {
@@ -376,7 +404,7 @@ bool GrammaAna::var_init_def(int firType, int dataType) // 0 int ,1 char
         )
         {,(＜标识符＞|＜标识符＞'['＜无符号整数＞']'|＜标识符＞'['＜无符号整数＞']''['＜无符号整数＞']' )}
 */
-
+//11.06 应该没啥要改的
 bool GrammaAna::var_noInit_def(int firType, int type)
 {
     while (NOWSYM == COMMA)
@@ -393,7 +421,7 @@ bool GrammaAna::var_noInit_def(int firType, int type)
     return 1;
 }
 
-// succ
+// 11.06 21:22 增加了变量的地址分配，数组的分配没动
 int GrammaAna::array_check(int type) //这个地方出现的错误可能是：重复定义，缺少']'
 {
     Symble_item tem_symble = Symble_item(NOWSTR, VAR, (TYPE_NAME)type);
@@ -492,6 +520,7 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
     else if (NOWSYM == IDENFR) // 变量
     {
         sym_index++;
+        tem_symble.gen_addr();
         if (NOW_SYMTAB.find(tem_symble) == NOW_SYMTAB.end())
             NOW_SYMTAB.insert(tem_symble);
         else
@@ -504,6 +533,7 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
 /*
     ＜变量定义＞ ::= ＜变量定义无初始化＞|＜变量定义及初始化＞
 */
+//11.06 增加了关于变量（非数组）定义的初始化地址以及赋值四元式
 bool GrammaAna::var_define() // succ
 {
     int datatype = 0;
@@ -519,13 +549,14 @@ bool GrammaAna::var_define() // succ
     }
     */
     sym_index++; //现在指向标识符
+    string namee = NOWSTR;
     int type = array_check(datatype);
     if (type == 0)
         return false;
     if (NOWSYM == ASSIGN)
     {
         sym_index++;
-        if (!var_init_def(type, datatype))
+        if (!var_init_def(type, datatype, namee))
         {
             cout << "Error in func var_define" << endl;
             return 0;
@@ -682,24 +713,69 @@ bool GrammaAna::condition_check()
 int GrammaAna::expre_check()
 {
     int typee = 0; // 1int,2char -1 void
+    int sign_flag = 0;
     if (NOWSYM == PLUS || NOWSYM == MINU)
     {
+        sign_flag = NOWSYM == PLUS ? 1 : 2;
         sym_index++;
         typee = 1;
     }
     int tem = item_check();
+    string str1 = res_iden;
+
+    if (sign_flag == 2) // 如果前面有符号
+    {
+        string tem_var1 = get_temvar();
+        interCode.emplace_back("-", "0", str1, tem_var1);
+        str1 = tem_var1;
+    }
+
     typee = typee == 1 ? typee : tem;
     if (tem == -1)
         typee = -1;
     while (NOWSYM == PLUS || NOWSYM == MINU) //fuck！！！ 加法运算符居然包括减法
     {
         sym_index++;
+        sign_flag = NOWSYM == PLUS ? 1 : 2;
         if (typee != -1)
             typee = 1;
         tem = item_check();
+        string str2 = res_iden;
+        string tem_var2 = get_temvar();
+        if (sign_flag == 1)
+        {
+            interCode.emplace_back("+", str1, str2, tem_var2);
+        }
+        else
+        {
+            interCode.emplace_back("-", str1, str2, tem_var2);
+        }
+        str1 = tem_var2;
         if (tem == -1)
             typee = -1;
     }
+    res_iden = str1;
+    if (typee == 2) // 如果是char
+    {
+        auto it = NOW_SYMTAB.find(Symble_item(str1, VAR, INT));
+        if (it == NOW_SYMTAB.end()) // 如果是字符常量
+        {
+            string tem_name = "#" + to_string(tem_var_num++);
+            Symble_item tem = Symble_item(tem_name, VAR, CHAR);
+            tem.gen_addr();
+            NOW_SYMTAB.insert(tem);
+            res_iden = tem_name;
+            interCode.emplace_back("=_const", str1, "", tem_name);
+        }
+        else
+        {
+            Symble_item temmm = *it;
+            temmm.data_type = CHAR;
+            NOW_SYMTAB.erase(it);
+            NOW_SYMTAB.insert(temmm);
+        }
+    }
+
     GRAOUT;
     cout << "<表达式>" << endl;
 #ifndef ERROR_HANDLAR
@@ -715,14 +791,28 @@ int GrammaAna::item_check()
 {
     int typee = 0;
     typee = factor_check();
+    string str1 = res_iden;
     while (NOWSYM == MULT || NOWSYM == DIV) //只要参与运算就会被变成int
     {
+        int sign_flag = NOWSYM == MULT ? 1 : 2;
         sym_index++;
         if (typee != -1)
             typee = 1;
         if (factor_check() == -1)
             typee = -1;
+        string str2 = res_iden;
+        string tem_var1 = get_temvar();
+        if (sign_flag == 1)
+        {
+            interCode.emplace_back("*", str1, str2, tem_var1);
+        }
+        else
+        {
+            interCode.emplace_back("/", str1, str2, tem_var1);
+        }
+        str1 = tem_var1;
     }
+    res_iden = str1;
     GRAOUT;
     cout << "<项>" << endl;
 #ifndef ERROR_HANDLAR
@@ -741,7 +831,8 @@ int GrammaAna::item_check()
 ＜字符＞｜
 ＜有返回值函数调用语句＞
 */
-//succ
+//11.06 增加了标识符和整数字符的处理，数组和函数调用没搞
+//如果发现是标识符是常量，则直接替换
 int GrammaAna::factor_check()
 {
     int typee = 0;
@@ -749,6 +840,7 @@ int GrammaAna::factor_check()
     {
         sym_index++;
         typee = expre_check();
+        //res_iden = res_iden; 这是一句正确且无用的语句
         if (NOWSYM != RPARENT) // )
         {
             add_error(NOWLINE, NO_RPARENT);
@@ -756,9 +848,11 @@ int GrammaAna::factor_check()
         else
             sym_index++;
     }
-    else if (NOWSYM == CHARCON)
+    else if (NOWSYM == CHARCON) //如果是字符，直接搞成整数
     {
         typee = 2;
+        int tem = toInt(NOWSTR);
+        res_iden = to_string(tem);
         sym_index++;
     }
     else if (NOWSYM == IDENFR and PEEKSYM(1) != LPARENT) //说明不是函数调用
@@ -815,13 +909,22 @@ int GrammaAna::factor_check()
                     sym_index++;
             }
         }
+        else //如果仅仅就是变量，直接返回
+        {
+            res_iden = tem_sym.name;
+            if (id_sym->iden_type == CONSTT) //如果是常量
+            {
+                res_iden = to_string(id_sym->const_val);
+            }
+        }
     }
     else if (NOWSYM == IDENFR and PEEKSYM(1) == LPARENT)
         typee = callFuncRet_check();
-    else
+    else //如果是整数
     {
         typee = 1;
-        integer_check();
+        int tem_val = integer_check();
+        res_iden = to_string(tem_val);
     }
     GRAOUT;
     cout << "<因子>" << endl;
@@ -1045,6 +1148,7 @@ bool GrammaAna::scanf_check()
         return 0;
     }
     sym_index++;
+    interCode.emplace_back("scanf", "", "", NOWSTR);
     if (NOWSYM != IDENFR)
     {
         cout << "Error in scanf" << endl;
@@ -1074,7 +1178,6 @@ bool GrammaAna::scanf_check()
 printf '(' ＜字符串＞,＜表达式＞ ')'|
 printf '('＜字符串＞ ')'|
 printf '('＜表达式＞')' 
-succ
 */
 bool GrammaAna::printf_check()
 {
@@ -1092,6 +1195,11 @@ bool GrammaAna::printf_check()
     sym_index++;
     if (NOWSYM == STRCON)
     {
+
+        str_const.push_back(NOWSTR); //for 中间代码生成
+        str_const_num++;
+        interCode.emplace_back("print_str", "str" + to_string(str_const_num - 1), "", "");
+
         sym_index++;
         GRAOUT;
         cout << "<字符串>" << endl;
@@ -1102,12 +1210,13 @@ bool GrammaAna::printf_check()
         {
             sym_index++;
             expre_check();
+            interCode.emplace_back("print_int", res_iden, "", "");
         }
     }
     else
     {
-        //sym_index++;
         expre_check();
+        interCode.emplace_back("print_int", res_iden, "", "");
     }
     if (NOWSYM != RPARENT)
     {
@@ -1444,6 +1553,7 @@ bool GrammaAna::value_para_list(const vector<TYPE_NAME> &real_para)
 ＜标识符＞'['＜表达式＞']'=＜表达式＞|
 ＜标识符＞'['＜表达式＞']''['＜表达式＞']' =＜表达式＞
 */
+//11.07 增加了变量赋值的中间代码
 bool GrammaAna::assign_check()
 {
 #define ERROR_                                  \
@@ -1454,6 +1564,7 @@ bool GrammaAna::assign_check()
 
     if (NOWSYM != IDENFR)
         ERROR_
+    string var_name = NOWSTR;
     IDENFR_EXIST_CONST_CHECK
     sym_index++;
 
@@ -1461,6 +1572,7 @@ bool GrammaAna::assign_check()
     {
         sym_index++;
         expre_check();
+        interCode.emplace_back("=", res_iden, "", var_name);
     }
     else if (NOWSYM == LBRACK)
     {
@@ -1658,6 +1770,7 @@ int GrammaAna::mult_sentence(int flag)
 */
 bool GrammaAna::func_noRet_define()
 {
+    string func_name;
     ret_in_func = 0;
     need_ret_type = 0;
     int name_line = 0;
@@ -1674,6 +1787,7 @@ bool GrammaAna::func_noRet_define()
     }
     name_line = NOWLINE;
     Symble_item tem_sym = Symble_item(NOWSTR, FUNC_NO_RET, VOID);
+    func_name = NOWSTR;
     noRetFunc_symSet.insert(NOWSTR);
     sym_index++;
     if (NOWSYM != LPARENT)
@@ -1717,6 +1831,7 @@ bool GrammaAna::func_noRet_define()
     }
     sym_index++;
 
+    running_symtable.emplace_back(func_name, sym_table_stk[sym_table_stk.size() - 1]);
     POP_SYMSTK;
 
     GRAOUT;
@@ -1766,6 +1881,7 @@ bool GrammaAna::func_define()
     sym_index++;
     name_line = NOWLINE;
     Symble_item tem_sym = Symble_item(NOWSTR, FUNC, typee == 1 ? INT : CHAR);
+    string func_name = NOWSTR; //记录函数名字
     sym_index--;
     statment_head();
 
@@ -1811,9 +1927,8 @@ bool GrammaAna::func_define()
         return 0;
     }
     sym_index++;
+    running_symtable.emplace_back(func_name, sym_table_stk[sym_table_stk.size() - 1]); //在pop之前加入运行符号表
     POP_SYMSTK;
-
-    
 
     GRAOUT;
     cout << "<有返回值函数定义>" << endl;
@@ -1826,8 +1941,11 @@ bool GrammaAna::func_define()
 /*
 ＜主函数＞    ::= void main‘(’‘)’ ‘{’＜复合语句＞‘}’ 
 */
+// 11.06 函数声明：生成一个生成标签的四元式，把当前的offset变成0
 bool GrammaAna::main_define()
 {
+    interCode.emplace_back("func", "main", "", "");
+    now_addr_offset = 0;
 #define ERROR_                                \
     {                                         \
         cout << "Error in main_func" << endl; \
@@ -1862,9 +1980,14 @@ bool GrammaAna::main_define()
         ERROR_
     sym_index++;
 #undef ERROR_
-
+    //把main函数的符号表加入运行符号表
+    running_symtable.emplace_back("main", sym_table_stk[sym_table_stk.size() - 1]);
+    //语法分析符号表弹出
     POP_SYMSTK;
-
+    //把main函数相关信息加入全局符号表
+    Symble_item tem_sym = Symble_item("main", FUNC_NO_RET, VOID);
+    tem_sym.tot_memory = now_addr_offset;
+    NOW_SYMTAB.insert(tem_sym);
     GRAOUT;
     cout << "<主函数>" << endl;
 #ifndef ERROR_HANDLAR
@@ -1913,7 +2036,7 @@ bool GrammaAna::top_programe()
         }
     }
     main_define();
-
+    running_symtable.emplace_back("#global", sym_table_stk[sym_table_stk.size() - 1]); //全局符号表
     POP_SYMSTK;
 
     GRAOUT;
