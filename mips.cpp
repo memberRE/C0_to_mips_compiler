@@ -20,12 +20,16 @@ inline int get_func_mem(string name)
     auto &symtable = running_symtable[running_symtable.size() - 1].tab;
     Symble_item tem = Symble_item(name, VAR, INT);
     auto func_ = symtable.find(tem);
+    if (func_ == symtable.end())
+    {
+        cout<<"can't find "<<"\'"<<name<<"\'"<<"in symtable"<<endl;  
+    }
     return func_->tot_memory;
 }
 
 Symble_item get_iden(string iden)
 {
-    for (int i = 1; i < running_symtable.size(); i++)
+    for (int i = 0; i < running_symtable.size(); i++)
     {
         if (running_symtable[i].name == now_func)
         {
@@ -85,27 +89,51 @@ inline void init()
 {
     mipsfile << ".data" << endl;
     mipsfile << "global: .space 10000" << endl;
+    mipsfile << "enter: .asciiz \"\\n\"" << endl;
     int id = 0;
     for (auto &str : str_const)
     {
         mipsfile << "str" + to_string(id++) << ": .asciiz "
-                 << "\"" + str + "\\n" + "\"" << endl;
+                 << "\"" + str + "\"" << endl;
     }
     mipsfile << ".text" << endl;
-    while (interCode[inter_index].op != "func" and inter_index < interCode.size())
+    while (inter_index < interCode.size() and interCode[inter_index].op == "=_const")
     {
         inter2mips(inter_index);
         inter_index++;
     }
     saveFp();
-    changeSp(get_func_mem("main") + 4);
+    int jkl = get_func_mem("main");
+    changeSp(jkl + 4);
     jal("main");
     syscall(10);
 }
 
+inline void debug_in_symTab_interCode()
+{
+    ofstream interfile("intercode.txt");
+    for (int i = 0; i < (int)interCode.size(); i++)
+        interCode[i].out(interfile);
+    interfile.close();
+    ofstream symtablefile("sym_table.txt");
+    for (RUN_TAB& tem : running_symtable)
+    {
+        symtablefile <<"##:"<<tem.name << endl;
+        for (const Symble_item& jkl : tem.tab)
+        {
+            jkl.out(symtablefile);
+        }
+        symtablefile << endl;
+    }
+    symtablefile.close();
+}
+
 void start_inter2mips()
 {
+    debug_in_symTab_interCode();
     init();
+    //syscall(10);
+    //return;
     while (inter_index < interCode.size())
     {
         inter2mips(inter_index);
@@ -115,9 +143,17 @@ void start_inter2mips()
 
 bool check_str_is_int(string iden)
 {
-    for (char a : iden)
-        if (!isdigit(a))
+    if (iden == "")
+        return false;
+    int i = 0;
+    if (iden[i] == '+' or iden[i] == '-')
+        i++;
+    for (; i < iden.size(); i++)
+        if (!isdigit(iden[i]))
             return false;
+    /*for (char a : iden)
+        if (!isdigit(a))
+            return false;*/
     return true;
 }
 
@@ -148,6 +184,33 @@ void inter2mips(int index)
     else if (now_code.op == "print_str")
     {
         la("$a0", now_code.iden1);
+        syscall(4);
+        la("$a0", "enter");
+        syscall(4);
+    }
+    else if (now_code.op == "print_str_and_exp")
+    {
+        la("$a0", now_code.iden1);
+        syscall(4);
+
+        if (check_str_is_int(now_code.iden2))
+        {
+            li("$a0", stoi(now_code.iden2));
+            syscall(1);
+        }
+        else
+        {
+            Symble_item tem = get_iden(now_code.iden2);
+            if (tem.name_space == "global") //全局变量
+                lw("$a0", "global+" + to_string(tem.addr));
+            else
+                lw("$a0", to_string(-tem.addr), "$fp"); //注意这里是负数
+            if (tem.data_type == INT)
+                syscall(1);
+            else
+                syscall(11);
+        }
+        la("$a0", "enter");
         syscall(4);
     }
     else if (now_code.op == "print_int") //四种情况 //如果是常数，并且是字符，则其一定是标识符，所以如果是常数一定是int
@@ -204,5 +267,10 @@ void inter2mips(int index)
     {
         load_from_mem(now_code.iden1, "$t0");
         store_to_mem(now_code.tar, "$t0");
+    }
+    else if (now_code.op == "ret_void")
+    {
+        setSp();
+        jr("$ra");
     }
 }

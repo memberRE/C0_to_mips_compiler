@@ -17,7 +17,7 @@ int main()
     //lexanaly.startAna();
     GrammaAna grammaAnaly(fin, fout, lexanaly);
     grammaAnaly.startGramAna();
-    start_inter2mips();
+    //start_inter2mips();
     fin.close();
     err_fout.close();
     fout.close();

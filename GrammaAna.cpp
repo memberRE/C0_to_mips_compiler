@@ -1,5 +1,6 @@
 #include "GrammaAna.h"
 #include "Inter.h"
+#include "mips.h"
 #include <map>
 #include <set>
 #include <string>
@@ -138,11 +139,11 @@ int GrammaAna::integer_check()
     }
     if (NOWSYM == INTCON)
     {
+        x *= toInt(NOWSTR);
         sym_index++;
         GRAOUT;
         file_out << "<无符号整数>" << endl;
         cout << "<无符号整数>" << endl;
-        x *= toInt(NOWSTR);
     }
     else
     {
@@ -221,7 +222,12 @@ bool GrammaAna::const_def() // finish
         }
         //-----
     } while (NOWSYM == COMMA);
-    GRAOUT;
+    //GRAOUT;
+    while (out_index < sym_index) 
+    {                             
+        lex_ana.OUT(out_index);   
+        out_index++;              
+    }
 #ifndef ERROR_HANDLAR
     file_out << "<常量定义>" << endl;
 #endif
@@ -735,8 +741,8 @@ int GrammaAna::expre_check()
         typee = -1;
     while (NOWSYM == PLUS || NOWSYM == MINU) //fuck！！！ 加法运算符居然包括减法
     {
-        sym_index++;
         sign_flag = NOWSYM == PLUS ? 1 : 2;
+        sym_index++;
         if (typee != -1)
             typee = 1;
         tem = item_check();
@@ -757,6 +763,20 @@ int GrammaAna::expre_check()
     res_iden = str1;
     if (typee == 2) // 如果是char
     {
+        int flag_all_int = 1;
+        for (char aa : str1)
+            if (!isdigit(aa))
+                flag_all_int = 0;
+        if (flag_all_int == 1) //为字符常量
+        {
+            string tem_name = "#" + to_string(tem_var_num++);
+            Symble_item tem = Symble_item(tem_name, VAR, CHAR);
+            tem.gen_addr();
+            NOW_SYMTAB.insert(tem);
+            res_iden = tem_name;
+            interCode.emplace_back("=_const", str1, "", tem_name);
+        }
+        /*
         auto it = NOW_SYMTAB.find(Symble_item(str1, VAR, INT));
         if (it == NOW_SYMTAB.end()) // 如果是字符常量
         {
@@ -773,7 +793,7 @@ int GrammaAna::expre_check()
             temmm.data_type = CHAR;
             NOW_SYMTAB.erase(it);
             NOW_SYMTAB.insert(temmm);
-        }
+        }*/
     }
 
     GRAOUT;
@@ -1210,7 +1230,9 @@ bool GrammaAna::printf_check()
         {
             sym_index++;
             expre_check();
-            interCode.emplace_back("print_int", res_iden, "", "");
+            interCode[interCode.size() - 1].op = "print_str_and_exp";
+            interCode[interCode.size() - 1].iden2 = res_iden;
+            //interCode.emplace_back("print_int", res_iden, "", "");
         }
     }
     else
@@ -1547,6 +1569,16 @@ bool GrammaAna::value_para_list(const vector<TYPE_NAME> &real_para)
     return 1;
 }
 
+bool all_numm(string& s)
+{
+    for (char a : s)
+        if (!isdigit(a))
+            return false;
+    return true;
+}
+
+
+
 /*
 ＜赋值语句＞   ::=  
 ＜标识符＞＝＜表达式＞|
@@ -1573,6 +1605,11 @@ bool GrammaAna::assign_check()
         sym_index++;
         expre_check();
         interCode.emplace_back("=", res_iden, "", var_name);
+        //Symble_item jklh = Symble_item(res_iden, VAR, INT);
+        //if (NOW_SYMTAB.find(jklh) == NOW_SYMTAB.end())
+        //    if (sym_table_stk[0].find(jklh) == sym_table_stk[0].end() and !all_numm(res_iden))
+        //        exit(0);
+
     }
     else if (NOWSYM == LBRACK)
     {
@@ -1945,6 +1982,7 @@ bool GrammaAna::func_define()
 bool GrammaAna::main_define()
 {
     interCode.emplace_back("func", "main", "", "");
+    //interCode.push_back(Inter("func", "main", "", ""));
     now_addr_offset = 0;
 #define ERROR_                                \
     {                                         \
@@ -1975,6 +2013,8 @@ bool GrammaAna::main_define()
     sym_index++;
 
     mult_sentence(0);
+
+    interCode.emplace_back("ret_void","","","");
 
     if (NOWSYM != RBRACE) // {
         ERROR_
@@ -2056,6 +2096,7 @@ void GrammaAna::startGramAna()
         cout << "出现了神秘错误，程序main函数后面不为EOF" << endl;
     }
     lex_ana.errHandle.OUTALL();
+    start_inter2mips();
 }
 
 void GrammaAna::add_error(int line_num, ERROR_TYPE__ e)

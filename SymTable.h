@@ -2,6 +2,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <fstream>
 using namespace std;
 
 extern int now_addr_offset;
@@ -43,8 +44,16 @@ public:
             has_ret = 1;
         else
             has_ret = 0;
-        tot_memory = 0;
+        addr = tot_memory = 0;
+        dimen = 0;
+        dimen_size[0] = dimen_size[1] = 0;
+        const_val = 0;
         name_space = "global";
+    }
+
+    void out(ofstream& file_ot) const
+    {
+        file_ot << name << "\t" << iden_type << "\t" << data_type << "\t" << addr << "\t" <<endl;
     }
 
     int gen_addr()
