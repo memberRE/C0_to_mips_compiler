@@ -1,6 +1,6 @@
-#include<fstream>
+#include <fstream>
 #include <iostream>
-#include<string>
+#include <string>
 using namespace std;
 extern ofstream mipsfile;
 
@@ -21,7 +21,10 @@ void setSp()
 
 void addLable(string name)
 {
-    mipsfile << name << ":" << endl;
+    if (name.size() > 0 and name[name.size() - 1] == ':')
+        mipsfile << name << endl;
+    else
+        mipsfile << name << ":" << endl;
 }
 
 void jal(string name)
@@ -40,7 +43,7 @@ void sw(string reg, string offset)
     mipsfile << "sw " << reg << ", " << offset << endl;
 }
 
-void sw(string reg, string offset,string loca)
+void sw(string reg, string offset, string loca)
 {
     mipsfile << "sw " << reg << ", " << offset << "(" << loca << ")" << endl;
 }
@@ -60,7 +63,7 @@ void lw(string reg, string offset)
     mipsfile << "lw " << reg << ", " << offset << endl;
 }
 
-void lw(string reg, string offset,string loca)
+void lw(string reg, string offset, string loca)
 {
     mipsfile << "lw " << reg << ", " << offset << "(" << loca << ")" << endl;
 }
@@ -73,6 +76,26 @@ void jr(string reg)
 void j(string tar)
 {
     mipsfile << "j " << tar << endl;
+}
+
+void bgtz(string tar, string reg1)
+{
+    mipsfile << "bgtz " << reg1 << ", " << tar << endl;
+}
+
+void bgez(string tar, string reg1)
+{
+    mipsfile << "bgez " << reg1 << ", " << tar << endl;
+}
+
+void blez(string tar, string reg1)
+{
+    mipsfile << "blez " << reg1 << ", " << tar << endl;
+}
+
+void bltz(string tar, string reg1)
+{
+    mipsfile << "bltz " << reg1 << ", " << tar << endl;
 }
 
 void beq(string tar, string reg1, string reg2)
@@ -112,12 +135,12 @@ void move(string dst, string src)
 
 void add(string dst, string op1, string op2)
 {
-    mipsfile << "add " << dst << ", " << op1 << ", " << op2 << endl;
+    mipsfile << "addu " << dst << ", " << op1 << ", " << op2 << endl;
 }
 
 void sub(string dst, string op1, string op2)
 {
-    mipsfile << "sub " << dst << ", " << op1 << ", " << op2 << endl;
+    mipsfile << "subu " << dst << ", " << op1 << ", " << op2 << endl;
 }
 
 void mult(string dst, string op1, string op2)

@@ -1,8 +1,8 @@
 #pragma once
+#include <fstream>
 #include <set>
 #include <string>
 #include <vector>
-#include <fstream>
 using namespace std;
 
 extern int now_addr_offset;
@@ -51,9 +51,9 @@ public:
         name_space = "global";
     }
 
-    void out(ofstream& file_ot) const
+    void out(ofstream &file_ot) const
     {
-        file_ot << name << "\t" << iden_type << "\t" << data_type << "\t" << addr << "\t" <<endl;
+        file_ot << name << "\t" << iden_type << "\t" << data_type << "\t" << addr << "\t" << endl;
     }
 
     int gen_addr()
@@ -61,6 +61,12 @@ public:
         this->addr = now_addr_offset;
         now_addr_offset += 4;
         return this->addr;
+    }
+
+    int gen_addr_sz(int size) {
+      this->addr = now_addr_offset;
+      now_addr_offset += size*4;
+      return this->addr;
     }
 
     bool operator<(const Symble_item &other) const
@@ -85,7 +91,7 @@ struct RUN_TAB
 {
     string name;
     set<Symble_item> tab;
-    RUN_TAB(string name, set<Symble_item>& tab) : name(name), tab(tab) {
-
+    RUN_TAB(string name, set<Symble_item> &tab) : name(name), tab(tab)
+    {
     }
 };

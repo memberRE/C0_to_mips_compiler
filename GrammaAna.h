@@ -59,16 +59,16 @@ private:
     bool scanf_check();
     bool ret_check(int flag);
     //succ
-    bool condition_check();
+    bool condition_check(int label_id);
     //succ
     int expre_check();
     //succ
-    bool step_check();
+    int step_check();
     int item_check();
     int factor_check();
-    bool condition_table(int type); // <情况表>
+    bool condition_table(int type,string tar_expr,int end_id); // <情况表>
     bool default_check();
-    bool sub_condition(int type);
+    bool sub_condition(int type,string tar_expr,int end_id);
     bool value_para_list(const vector<TYPE_NAME> & real_para); // <值参数表>
     //succ
     bool statment_head();// <声明头部>

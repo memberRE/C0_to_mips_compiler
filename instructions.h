@@ -25,3 +25,7 @@ void add(string dst, string op1, string op2);
 void sub(string dst, string op1, string op2);
 void mult(string dst, string op1, string op2);
 void div(string dst, string op1, string op2);
+void bgtz(string tar, string reg1);
+void bgez(string tar, string reg1);
+void blez(string tar, string reg1);
+void bltz(string tar, string reg1);

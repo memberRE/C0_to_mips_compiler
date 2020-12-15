@@ -6,14 +6,18 @@
 #include <iostream>
 #include <string>
 #include <vector>
+//#define now_func (func_stk.size() > 0 ?func_stk[func_stk.size()-1]:"global")
 using namespace std;
 
 extern ofstream mipsfile;
 extern vector<Inter> interCode;
 extern vector<string> str_const; //名字依次为str0,str1....
 extern vector<RUN_TAB> running_symtable;
-string now_func = "main";
+string now_func = "global";
 int inter_index = 0;
+
+vector<Inter> para_stk;
+//      vector<string> func_stk = {"main"};
 
 inline int get_func_mem(string name)
 {
@@ -22,7 +26,9 @@ inline int get_func_mem(string name)
     auto func_ = symtable.find(tem);
     if (func_ == symtable.end())
     {
-        cout<<"can't find "<<"\'"<<name<<"\'"<<"in symtable"<<endl;  
+        cout << "can't find "
+             << "\'" << name << "\'"
+             << "in symtable" << endl;
     }
     return func_->tot_memory;
 }
@@ -51,7 +57,7 @@ Symble_item get_iden(string iden)
         tem.name_space = "global";
         return tem;
     }
-    cout << "error in get iden" << endl;  
+    cout << "error in get iden" << endl;
 }
 
 void store_to_mem(string iden, string reg)
@@ -67,7 +73,7 @@ void store_to_mem(string iden, string reg)
     }
 }
 
-void load_from_mem(string iden,string reg)
+void load_from_mem(string iden, string reg)
 {
     if (check_str_is_int(iden))
     {
@@ -94,10 +100,17 @@ inline void init()
     for (auto &str : str_const)
     {
         mipsfile << "str" + to_string(id++) << ": .asciiz "
-                 << "\"" + str + "\"" << endl;
+                 << "\""; //+ str + "\"" << endl;
+        for (char a : str)
+        {
+            if (a == '\\')
+                mipsfile << "\\";
+            mipsfile << a;
+        }
+        mipsfile << "\"" << endl;
     }
     mipsfile << ".text" << endl;
-    while (inter_index < interCode.size() and interCode[inter_index].op == "=_const")
+    while (inter_index < interCode.size() and (interCode[inter_index].op == "=_const" or interCode[inter_index].op == "array_init"))
     {
         inter2mips(inter_index);
         inter_index++;
@@ -116,10 +129,10 @@ inline void debug_in_symTab_interCode()
         interCode[i].out(interfile);
     interfile.close();
     ofstream symtablefile("sym_table.txt");
-    for (RUN_TAB& tem : running_symtable)
+    for (RUN_TAB &tem : running_symtable)
     {
-        symtablefile <<"##:"<<tem.name << endl;
-        for (const Symble_item& jkl : tem.tab)
+        symtablefile << "##:" << tem.name << endl;
+        for (const Symble_item &jkl : tem.tab)
         {
             jkl.out(symtablefile);
         }
@@ -168,6 +181,7 @@ void inter2mips(int index)
     else if (now_code.op == "func")
     {
         addLable(now_code.iden1);
+        now_func = now_code.iden1;
     }
     else if (now_code.op == "scanf")
     {
@@ -196,7 +210,10 @@ void inter2mips(int index)
         if (check_str_is_int(now_code.iden2))
         {
             li("$a0", stoi(now_code.iden2));
-            syscall(1);
+            if (now_code.tar == "char")
+                syscall(11);
+            else
+                syscall(1);
         }
         else
         {
@@ -205,7 +222,7 @@ void inter2mips(int index)
                 lw("$a0", "global+" + to_string(tem.addr));
             else
                 lw("$a0", to_string(-tem.addr), "$fp"); //注意这里是负数
-            if (tem.data_type == INT)
+            if (tem.data_type == INT and now_code.tar == "int")
                 syscall(1);
             else
                 syscall(11);
@@ -218,7 +235,10 @@ void inter2mips(int index)
         if (check_str_is_int(now_code.iden1))
         {
             li("$a0", stoi(now_code.iden1));
-            syscall(1);
+            if (now_code.tar == "char")
+                syscall(11);
+            else
+                syscall(1);
         }
         else
         {
@@ -227,10 +247,10 @@ void inter2mips(int index)
                 lw("$a0", "global+" + to_string(tem.addr));
             else
                 lw("$a0", to_string(-tem.addr), "$fp"); //注意这里是负数
-            if (tem.data_type == INT)
-                syscall(1);
-            else
+            if (now_code.tar == "char")
                 syscall(11);
+            else
+                syscall(1);
         }
         li("$a0", 10);
         syscall(11);
@@ -268,9 +288,156 @@ void inter2mips(int index)
         load_from_mem(now_code.iden1, "$t0");
         store_to_mem(now_code.tar, "$t0");
     }
-    else if (now_code.op == "ret_void")
+    else if (now_code.op == "return")
     {
-        setSp();
+        // setSp();
+        if (now_code.iden1 != "")
+        {
+            load_from_mem(now_code.iden1, "$v0");
+        }
         jr("$ra");
     }
+    else if (now_code.op == "array_init" || now_code.op == "save_arr_val") // 这个地方其实应该为了优化分开，但是不优化就合并到一起吧
+    {
+        load_from_mem(now_code.iden2, "$t0"); // offset
+        load_from_mem(now_code.tar, "$t1");
+        Symble_item tem = get_iden(now_code.iden1); //得到数组的sym
+        if (tem.name_space == "global")             //全局数组
+        {
+            la("$t2", "global");
+            li("$t3", tem.addr);
+            add("$t2", "$t2", "$t3"); // 数组基地址
+            add("$t2", "$t2", "$t0");
+            sw("$t1", "0", "$t2");
+            //lw(reg, "global+" + to_string(tem.addr));
+        }
+        else
+        {
+            // lw(reg, to_string(-tem.addr), "$fp");
+            li("$t2", tem.addr);
+            add("$t2", "$t2", "$t0");
+            sub("$t2", "$fp", "$t2"); // t2是基地址
+            sw("$t1", "0", "$t2");
+        }
+    }
+    else if (now_code.op == "set_lab")
+    {
+        addLable(now_code.iden1);
+    }
+    else if (now_code.op == "get_arr_val")
+    {
+        load_from_mem(now_code.iden2, "$t0"); // offset
+        //load_from_mem(now_code.tar, "$t1");
+        Symble_item tem = get_iden(now_code.iden1); //得到数组的sym
+        if (tem.name_space == "global")             //全局数组
+        {
+            la("$t2", "global");
+            li("$t3", tem.addr);
+            add("$t2", "$t2", "$t3"); // 数组基地址
+            add("$t2", "$t2", "$t0");
+            lw("$t1", "0", "$t2");
+            store_to_mem(now_code.tar, "$t1");
+        }
+        else
+        {
+            li("$t2", tem.addr);
+            add("$t2", "$t2", "$t0");
+            sub("$t2", "$fp", "$t2"); // t2是基地址
+
+            lw("$t1", "0", "$t2");
+            store_to_mem(now_code.tar, "$t1");
+        }
+    }
+    else if (now_code.op == "save_reg")
+    {
+        sw("$fp", "0", "$sp");
+        changeSp(4);
+        sw("$ra", "0", "$sp");
+        changeSp(4);
+        //saveFp();
+    }
+    else if (now_code.op == "load_reg")
+    {
+        setSp();
+        changeSp(-4);
+        lw("$ra", "0", "$sp");
+        changeSp(-4);
+        lw("$fp", "0", "$sp");
+    }
+    else if (now_code.op == "get_ret")
+    {
+        store_to_mem(now_code.tar, "$v0");
+    }
+    else if (now_code.op == "call") // 保证了call前面一定是对应的参数压栈的中间代码，再前面一定是保存寄存器的代码
+    {
+        int jkl = get_func_mem(now_code.iden1);
+        //changeSp(jkl + 4);
+        int offseet = 0;
+        for (Inter &para : para_stk)
+        {
+            load_from_mem(para.iden1, "$t0");
+            // 这个时候fp千万不能改，要靠这个东西找压入stack的变量
+
+            sw("$t0", to_string(-offseet), "$sp");
+            //此时对于要进入的函数，sp才是栈底
+            offseet += 4;
+        }
+        saveFp();
+        changeSp(jkl + 4);
+        para_stk.clear();
+        jal(now_code.iden1);
+        //now_func = now_code.iden1;
+    }
+    else if (now_code.op == "push_para")
+    {
+        para_stk.push_back(now_code);
+    }
+    else if (now_code.op == "jump")
+    {
+        j(now_code.iden1);
+    }
+    // 这些全是和0比较
+    else if (now_code.op == "GRE") // > bgtz
+    {
+        load_from_mem(now_code.iden1, "$t0");
+        bgtz(now_code.tar, "$t0");
+    }
+    else if (now_code.op == "LSS") // < bltz
+    {
+        load_from_mem(now_code.iden1, "$t0");
+        bltz(now_code.tar, "$t0");
+    }
+    else if (now_code.op == "GEQ") // >= bgez
+    {
+        load_from_mem(now_code.iden1, "$t0");
+        bgez(now_code.tar, "$t0");
+    }
+    else if (now_code.op == "LEQ") // <= blez
+    {
+        load_from_mem(now_code.iden1, "$t0");
+        blez(now_code.tar, "$t0");
+    }
+    else if (now_code.op == "NEQ") // !=
+    {
+        load_from_mem(now_code.iden1, "$t0");
+        if (now_code.iden2 == "")
+            bne(now_code.tar, "$t0", "$0");
+        else
+        {
+            load_from_mem(now_code.iden2, "$t1");
+            bne(now_code.tar, "$t0", "$t1");
+        }
+    }
+    else if (now_code.op == "EQL") // ==
+    {
+        load_from_mem(now_code.iden1, "$t0");
+        if (now_code.iden2 == "")
+            beq(now_code.tar, "$t0", "$0");
+        else
+        {
+            load_from_mem(now_code.iden2, "$t1");
+            beq(now_code.tar, "$t0", "$t1");
+        }
+    }
+    mipsfile << "#---------" << now_code.op << "," << now_code.iden1 << "," << now_code.iden2 << "," << now_code.tar << endl;
 }

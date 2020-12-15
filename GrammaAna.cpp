@@ -24,11 +24,13 @@ int need_ret_type = 0;
 vector<symType> sym_stk;
 vector<set<Symble_item>> sym_table_stk; // 符号表
 vector<RUN_TAB> running_symtable;       // 中间代码转化成mips的时候用的符号表，上面那个符号表被弹出之后就放进这个里面。
-int now_addr_offset;             //记录当前符号表地址分配的offset
+int now_addr_offset;                    //记录当前符号表地址分配的offset
 int str_const_num = 0;                  //记录有多少字符串常量
 vector<string> str_const;               //记录这些字符串常量是什么
 string res_iden;                        //给表达式，因子，项函数用的返回值，保存了结果在哪个标识符。
 int tem_var_num = 0;                    //临时变量到了第多少个
+
+int label_cnt = 0; // 给生成的label标号
 
 vector<Inter> interCode; //中间代码
 
@@ -102,6 +104,12 @@ int out_index = 0;              //out_index指向下一个需要输出的sym
     else if (id_sym->iden_type == CONSTT)                               \
         add_error(NOWLINE, CONST_WRI_ERR);
 
+inline string lab_to_str(int labid)
+{
+    string s = "label" + to_string(labid);
+    return s;
+}
+
 string get_temvar()
 {
     string tem_name = "#" + to_string(tem_var_num++);
@@ -114,6 +122,19 @@ string get_temvar()
 inline int toInt(string &str)
 {
     int x = 0;
+    if (NOWSYM == PLUS || NOWSYM == MINU)
+    {
+        sym_index++;
+        for (int i = 0; i < NOWSTR.size(); i++)
+        {
+            x *= 10;
+            x += NOWSTR[i] - '0';
+        }
+        sym_index--;
+        if (NOWSYM == MINU)
+            x *= -1;
+        return x;
+    }
     if (str.size() == 1)
         return (NOWSYM == CHARCON) ? str[0] : (int)str[0] - '0';
     else
@@ -223,10 +244,10 @@ bool GrammaAna::const_def() // finish
         //-----
     } while (NOWSYM == COMMA);
     //GRAOUT;
-    while (out_index < sym_index) 
-    {                             
-        lex_ana.OUT(out_index);   
-        out_index++;              
+    while (out_index < sym_index)
+    {
+        lex_ana.OUT(out_index);
+        out_index++;
     }
 #ifndef ERROR_HANDLAR
     file_out << "<常量定义>" << endl;
@@ -296,6 +317,8 @@ int GrammaAna::const_check()
     ＜类型标识符＞＜标识符＞'['＜无符号整数＞']''['＜无符号整数＞']'='{''{'＜常量＞{,＜常量＞}'}'{, '{'＜常量＞{,＜常量＞}'}'}'}'
 */
 // 11.06 增加了变量的初始化的四元式输出
+// 12.10 增加了数组的初始化四元式
+//
 bool GrammaAna::var_init_def(int firType, int dataType, string iden_name) // 0 int ,1 char
 {
     if (firType == 1) //变量
@@ -319,6 +342,8 @@ bool GrammaAna::var_init_def(int firType, int dataType, string iden_name) // 0 i
         do
         {
             sym_index++;
+            int val = toInt(NOWSTR); //中间代码：array_init 数组名 offset val
+            interCode.emplace_back("array_init", iden_name, to_string(4 * arr_1d_num), to_string(val));
             int get_type = const_check();
             arr_1d_num++;
             if (get_type != dataType)
@@ -340,6 +365,7 @@ bool GrammaAna::var_init_def(int firType, int dataType, string iden_name) // 0 i
     else if (firType == 3)
     {
         int arr_1d_num = 0;
+        int tem_num = 0;
         if (NOWSYM != LBRACE) //{
         {
             cout << "Error in func var_init_def" << endl;
@@ -359,6 +385,9 @@ bool GrammaAna::var_init_def(int firType, int dataType, string iden_name) // 0 i
             {
                 sym_index++;
                 arr_2d_num++;
+                int val = toInt(NOWSTR); //中间代码：array_init 数组名 offset val
+                interCode.emplace_back("array_init", iden_name, to_string(4 * tem_num), to_string(val));
+                tem_num++;
                 int get_type = const_check();
                 if (get_type != dataType)
                 {
@@ -428,6 +457,7 @@ bool GrammaAna::var_noInit_def(int firType, int type)
 }
 
 // 11.06 21:22 增加了变量的地址分配，数组的分配没动
+// 12.09 增加数组的地址分配
 int GrammaAna::array_check(int type) //这个地方出现的错误可能是：重复定义，缺少']'
 {
     Symble_item tem_symble = Symble_item(NOWSTR, VAR, (TYPE_NAME)type);
@@ -479,6 +509,9 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
         }
         else
             sym_index++;
+
+        tem_symble.gen_addr_sz(tem_symble.dimen_size[0] * tem_symble.dimen_size[1]);
+
         if (NOW_SYMTAB.find(tem_symble) == NOW_SYMTAB.end())
             NOW_SYMTAB.insert(tem_symble);
         else
@@ -514,6 +547,9 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
         }
         else
             sym_index++;
+
+        tem_symble.gen_addr_sz(tem_symble.dimen_size[0]);
+
         if (NOW_SYMTAB.find(tem_symble) == NOW_SYMTAB.end())
             NOW_SYMTAB.insert(tem_symble);
         else
@@ -539,7 +575,8 @@ int GrammaAna::array_check(int type) //这个地方出现的错误可能是：�
 /*
     ＜变量定义＞ ::= ＜变量定义无初始化＞|＜变量定义及初始化＞
 */
-//11.06 增加了关于变量（非数组）定义的初始化地址以及赋值四元式
+// 11.06 增加了关于变量（非数组）定义的初始化地址以及赋值四元式
+// 12.09 增加了关于数组定义初始化地址及其赋值（未完成）
 bool GrammaAna::var_define() // succ
 {
     int datatype = 0;
@@ -609,8 +646,10 @@ bool GrammaAna::var_statment() // succ
     return true;
 }
 /*
-    ＜参数表＞    ::=  ＜类型标识符＞＜标识符＞{,＜类型标识符＞＜标识符＞}| ＜空＞
+    ＜参数表＞    ::=  ＜类型标识符＞＜标识符＞{,＜类型标识符＞＜标识符＞}|
+   ＜空＞
 */
+// 增加了分配内存地址
 bool GrammaAna::para_list(Symble_item &item)
 {
     if (NOWSYM == RPARENT or NOWSYM == LBRACE) //因为有可能缺少右小括号
@@ -640,6 +679,7 @@ bool GrammaAna::para_list(Symble_item &item)
             return 0;
         }
         Symble_item tem_sym = Symble_item(NOWSTR, VAR, type_name);
+        tem_sym.gen_addr();
         //---add to symTable
         if (NOW_SYMTAB.find(tem_sym) != NOW_SYMTAB.end())
         {
@@ -660,13 +700,14 @@ bool GrammaAna::para_list(Symble_item &item)
 /*
 ＜步长＞::= ＜无符号整数＞  
 */
-bool GrammaAna::step_check()
+int GrammaAna::step_check()
 {
     if (NOWSYM != INTCON)
     {
         cout << "Error in step_check" << endl;
         return 0;
     }
+    int x = toInt(NOWSTR);
     sym_index++;
     GRAOUT;
     cout << "<无符号整数>" << endl;
@@ -678,17 +719,18 @@ bool GrammaAna::step_check()
 #ifndef ERROR_HANDLAR
     file_out << "<步长>" << endl;
 #endif
-    return 1;
+    return x;
 }
 
 /*
 ＜条件＞    ::=  ＜表达式＞＜关系运算符＞＜表达式＞
 */
-// succ
-bool GrammaAna::condition_check()
+//12.11 finish
+bool GrammaAna::condition_check(int label_id) // 这里的表情直接拿全局的标签总数减一，，，大概是对的？
 {
     int typee;
     typee = expre_check();
+    string res = res_iden; // 保存表达式返回的结果，注意这个可能是个常数
     if (typee == 2)
     {
         add_error(NOWLINE, CONDITION_TYPE_ERR);
@@ -699,12 +741,31 @@ bool GrammaAna::condition_check()
         cout << "Error in func condition_check" << endl;
         return 0;
     }
+    string rela_op = ""; // 记录是什么关系运算符,注意这里是反过来的
+    if (NOWSYM == LSS)
+        rela_op = "GEQ";
+    if (NOWSYM == LEQ)
+        rela_op = "GRE";
+    if (NOWSYM == GRE)
+        rela_op = "LEQ";
+    if (NOWSYM == GEQ)
+        rela_op = "LSS";
+    if (NOWSYM == EQL)
+        rela_op = "NEQ";
+    if (NOWSYM == NEQ)
+        rela_op = "EQL";
     sym_index++;
     typee = expre_check();
+    string res2 = res_iden;
     if (typee == 2)
     {
         add_error(NOWLINE, CONDITION_TYPE_ERR);
     }
+
+    string tem_var = get_temvar();
+    interCode.emplace_back("-", res, res2, tem_var);                    //临时变量储存相减的值
+    interCode.emplace_back(rela_op, tem_var, "", lab_to_str(label_id)); // 这是跳转到结束的label
+
     GRAOUT;
     cout << "<条件>" << endl;
 #ifndef ERROR_HANDLAR
@@ -851,8 +912,9 @@ int GrammaAna::item_check()
 ＜字符＞｜
 ＜有返回值函数调用语句＞
 */
-//11.06 增加了标识符和整数字符的处理，数组和函数调用没搞
+// 11.06 增加了标识符和整数字符的处理，数组和函数调用没搞
 //如果发现是标识符是常量，则直接替换
+//12.10 ok?
 int GrammaAna::factor_check()
 {
     int typee = 0;
@@ -860,6 +922,8 @@ int GrammaAna::factor_check()
     {
         sym_index++;
         typee = expre_check();
+        if (typee == 2)
+            typee = 1;
         //res_iden = res_iden; 这是一句正确且无用的语句
         if (NOWSYM != RPARENT) // )
         {
@@ -877,6 +941,7 @@ int GrammaAna::factor_check()
     }
     else if (NOWSYM == IDENFR and PEEKSYM(1) != LPARENT) //说明不是函数调用
     {
+        int dem1 = 0, dem2 = 0; // 数组维度信息
         Symble_item tem_sym = Symble_item(NOWSTR, VAR, INT);
         sym_index++;
         int if_findd = 1;
@@ -898,11 +963,19 @@ int GrammaAna::factor_check()
             add_error(NOWLINE, NAME_NODEF);
         }
         else
+        {
             typee = id_sym->data_type == INT ? 1 : 2;
+            dem1 = id_sym->dimen_size[0];
+            dem2 = id_sym->dimen_size[1]; // 获取数组的维度信息
+        }
+
+        //上面是错误处理+读取数组维度信息的内容
+
         if (NOWSYM == LBRACK) // [
         {
             sym_index++;
             int tem_typee = expre_check();
+            string res_1 = res_iden;
             if (tem_typee == 2) //即不是未定义和int，是char
             {
                 add_error(NOWLINE, INDEX_ERR);
@@ -917,6 +990,15 @@ int GrammaAna::factor_check()
             {
                 sym_index++;
                 tem_typee = expre_check();
+                string res_2 = res_iden;
+                string tem_var1 = get_temvar();
+                string tem_var2 = get_temvar();
+                string tem_var3 = get_temvar();
+                interCode.emplace_back("*", res_1, to_string(dem2), tem_var1);
+                interCode.emplace_back("+", tem_var1, res_2, tem_var2);
+                interCode.emplace_back("*", tem_var2, "4", tem_var2);
+                interCode.emplace_back("get_arr_val", id_sym->name, tem_var2, tem_var3);
+                res_iden = tem_var3;
                 if (tem_typee == 2) //即不是未定义和int，是char
                 {
                     add_error(NOWLINE, INDEX_ERR);
@@ -927,6 +1009,14 @@ int GrammaAna::factor_check()
                 }
                 else
                     sym_index++;
+            }
+            else // 一维数组
+            {
+                string tem_var2 = get_temvar();
+                string tem_var3 = get_temvar();
+                interCode.emplace_back("*", res_1, "4", tem_var2);
+                interCode.emplace_back("get_arr_val", id_sym->name, tem_var2, tem_var3);
+                res_iden = tem_var3;
             }
         }
         else //如果仅仅就是变量，直接返回
@@ -939,7 +1029,14 @@ int GrammaAna::factor_check()
         }
     }
     else if (NOWSYM == IDENFR and PEEKSYM(1) == LPARENT)
+    {
+        //interCode.emplace_back("save_reg", "", "", ""); 后面修改的时候把这个放在压参数前面了
         typee = callFuncRet_check();
+        string tem_var = get_temvar();
+        interCode.emplace_back("load_reg", "", "", "");
+        interCode.emplace_back("get_ret", "", "", tem_var);
+        res_iden = tem_var;
+    }
     else //如果是整数
     {
         typee = 1;
@@ -969,11 +1066,15 @@ bool GrammaAna::whileFor_check()
     }
     if (NOWSYM == WHILETK)
     {
+        int while_begin_lab = label_cnt++;
+        interCode.emplace_back("set_lab", lab_to_str(while_begin_lab) + ":", "", ""); // 分配begin
+        int lab_id = label_cnt;                                                       //先分配一个id
+        label_cnt++;
         sym_index++;
         if (NOWSYM != LPARENT)
             ERROR_
         sym_index++;
-        condition_check();
+        condition_check(lab_id);
         if (NOWSYM != RPARENT)
         {
             add_error(NOWLINE, NO_RPARENT);
@@ -981,6 +1082,8 @@ bool GrammaAna::whileFor_check()
         else
             sym_index++;
         sentence_check(0); // 这个地方flag参数实际上已经被弃用，没必要加了
+        interCode.emplace_back("jump", lab_to_str(while_begin_lab), "", "");
+        interCode.emplace_back("set_lab", "label" + to_string(lab_id) + ":", "", "");
     }
     else if (NOWSYM == FORTK)
     {
@@ -1016,7 +1119,11 @@ bool GrammaAna::whileFor_check()
         if (NOWSYM != ASSIGN)
             ERROR_
         sym_index++;
+
         expre_check();
+        string res1 = res_iden;
+        interCode.emplace_back("=", res1, "", id_sym->name); // 初始化
+
         if (NOWSYM != SEMICN)
         {
             add_error(LAS_LINENUM, NO_SEM);
@@ -1024,7 +1131,11 @@ bool GrammaAna::whileFor_check()
         else
             sym_index++;
 
-        condition_check();
+        int while_begin_lab = label_cnt++;
+        interCode.emplace_back("set_lab", lab_to_str(while_begin_lab) + ":", "", ""); // 分配begin
+        int end_lab_id = label_cnt++;                                                 //先分配一个id
+
+        condition_check(end_lab_id);
 
         if (NOWSYM != SEMICN)
         {
@@ -1034,6 +1145,9 @@ bool GrammaAna::whileFor_check()
             sym_index++;
         if (NOWSYM != IDENFR)
             ERROR_
+
+        string id111 = "";
+        string id222 = "";
         //------------------------------------------id_check
         tem_sym = Symble_item(NOWSTR, VAR, INT);
         if_found = 1;
@@ -1056,6 +1170,8 @@ bool GrammaAna::whileFor_check()
             add_error(NOWLINE, CONST_WRI_ERR);
         }
         //---------------------------------------------------
+        id111 = id_sym->name;
+
         sym_index++;
         if (NOWSYM != ASSIGN)
             ERROR_
@@ -1080,12 +1196,15 @@ bool GrammaAna::whileFor_check()
             add_error(NOWLINE, NAME_NODEF);
         }
         //---------------------------------------------------
+        id222 = id_sym->name;
+        string step_sign = "";
         sym_index++;
+        step_sign = NOWSYM == PLUS ? "+" : "-";
         if (NOWSYM != PLUS and NOWSYM != MINU)
             ERROR_
         sym_index++;
 
-        step_check();
+        int x = step_check();
 
         if (NOWSYM != RPARENT)
         {
@@ -1095,6 +1214,9 @@ bool GrammaAna::whileFor_check()
             sym_index++;
 
         sentence_check(0);
+        interCode.emplace_back(step_sign, id222, to_string(x), id111);
+        interCode.emplace_back("jump", lab_to_str(while_begin_lab), "", "");
+        interCode.emplace_back("set_lab", "label" + to_string(end_lab_id) + ":", "", "");
     }
     else
         ERROR_
@@ -1110,6 +1232,7 @@ bool GrammaAna::whileFor_check()
 /*
 ＜条件语句＞  ::= if '('＜条件＞')'＜语句＞［else＜语句＞］
 */
+//succ
 bool GrammaAna::if_check()
 {
     if (NOWSYM != IFTK)
@@ -1125,7 +1248,10 @@ bool GrammaAna::if_check()
     }
     sym_index++;
 
-    condition_check();
+    int if_end_lab = label_cnt++;
+    int tem_lab = label_cnt++;
+
+    condition_check(if_end_lab);
 
     if (NOWSYM != RPARENT)
     {
@@ -1135,13 +1261,20 @@ bool GrammaAna::if_check()
         sym_index++;
 
     sentence_check(0);
-
+    interCode.emplace_back("jump", lab_to_str(tem_lab), "", "");
+    int else_flag = 0;
     if (NOWSYM == ELSETK)
     {
+        else_flag = 1;
+        interCode.emplace_back("set_lab", lab_to_str(if_end_lab) + ":", "", "");
         sym_index++;
         sentence_check(0);
     }
-
+    if (else_flag == 0)
+    {
+        interCode.emplace_back("set_lab", lab_to_str(if_end_lab) + ":", "", "");
+    }
+    interCode.emplace_back("set_lab", lab_to_str(tem_lab) + ":", "", "");
     GRAOUT
     cout << "<条件语句>" << endl;
 #ifndef ERROR_HANDLAR
@@ -1229,16 +1362,29 @@ bool GrammaAna::printf_check()
         if (NOWSYM == COMMA)
         {
             sym_index++;
-            expre_check();
-            interCode[interCode.size() - 1].op = "print_str_and_exp";
-            interCode[interCode.size() - 1].iden2 = res_iden;
+            int typee = expre_check();
+            for (int i = interCode.size() - 1; i >= 0; i--)
+            {
+                if (interCode[i].op == "print_str")
+                {
+                    Inter interr = interCode[i];
+                    interCode[i].op = "Nullll";
+                    interr.op = "print_str_and_exp";
+                    interr.iden2 = res_iden;
+                    interr.tar = typee == 2 ? "char" : "int";
+                    interCode.push_back(interr);
+                    break;
+                }
+            }
+            // interCode[interCode.size() - 1].op = "print_str_and_exp";
+            // interCode[interCode.size() - 1].iden2 = res_iden;
             //interCode.emplace_back("print_int", res_iden, "", "");
         }
     }
     else
     {
-        expre_check();
-        interCode.emplace_back("print_int", res_iden, "", "");
+        int typee = expre_check();
+        interCode.emplace_back("print_int", res_iden, "", typee == 2 ? "char" : "int");
     }
     if (NOWSYM != RPARENT)
     {
@@ -1269,6 +1415,7 @@ bool GrammaAna::ret_check(int flag)
         return 0;
     }
     sym_index++;
+    string res = "";
     if (NOWSYM == LPARENT)
     {
         sym_index++;
@@ -1279,6 +1426,7 @@ bool GrammaAna::ret_check(int flag)
             return 1;
         }
         int temtype = expre_check();
+        res = res_iden;
         if (temtype != need_ret_type and temtype != -1)
         {
             add_error(NOWLINE, need_ret_type == 0 ? NORET_FUNC_ERR : RET_FUNC_ERR);
@@ -1295,6 +1443,7 @@ bool GrammaAna::ret_check(int flag)
         if (need_ret_type != 0)
             add_error(NOWLINE, RET_FUNC_ERR);
     }
+    interCode.emplace_back("return", res, "", "");
     GRAOUT;
     cout << "<返回语句>" << endl;
 #ifndef ERROR_HANDLAR
@@ -1335,11 +1484,11 @@ bool GrammaAna::default_check()
 /*
 ＜情况表＞   ::=  ＜情况子语句＞{＜情况子语句＞} 
 */
-bool GrammaAna::condition_table(int type)
+bool GrammaAna::condition_table(int type, string tar_expr, int end_id)
 {
     do
     {
-        sub_condition(type);
+        sub_condition(type, tar_expr, end_id);
     } while (NOWSYM == CASETK);
 
     GRAOUT;
@@ -1353,7 +1502,8 @@ bool GrammaAna::condition_table(int type)
 /*
 ＜情况子语句＞  ::=  case＜常量＞：＜语句＞
 */
-bool GrammaAna::sub_condition(int type)
+// succ_in mips
+bool GrammaAna::sub_condition(int type, string tar_expr, int end_id)
 {
     if (NOWSYM != CASETK)
     {
@@ -1361,6 +1511,10 @@ bool GrammaAna::sub_condition(int type)
         return 0;
     }
     sym_index++;
+    int x = toInt(NOWSTR);
+    // 如果是字符会返回asc，如果是正数负数，可以自动读取下一个SYM获得其值，然后再把index返回；
+    int case_end_id = label_cnt++;
+    interCode.emplace_back("NEQ", tar_expr, to_string(x), lab_to_str(case_end_id));
 
     int temtype = const_check() + 1;
     if (type != -1 and temtype != type)
@@ -1375,7 +1529,8 @@ bool GrammaAna::sub_condition(int type)
     sym_index++;
 
     sentence_check(0);
-
+    interCode.emplace_back("jump", lab_to_str(end_id), "", "");
+    interCode.emplace_back("set_lab", lab_to_str(case_end_id) + ":", "", "");
     GRAOUT;
     cout << "<情况子语句>" << endl;
 #ifndef ERROR_HANDLAR
@@ -1385,9 +1540,9 @@ bool GrammaAna::sub_condition(int type)
 }
 
 /*
-＜情况语句＞  ::=  switch ‘(’＜表达式＞‘)’ ‘{’＜情况表＞＜缺省＞‘}’ 
-succ
+＜情况语句＞  ::=  switch ‘(’＜表达式＞‘)’ ‘{’＜情况表＞＜缺省＞‘}’
 */
+// ok in mips
 bool GrammaAna::switch_check()
 {
     if (NOWSYM != SWITCHTK)
@@ -1404,7 +1559,8 @@ bool GrammaAna::switch_check()
     sym_index++;
     int typee;
     typee = expre_check();
-
+    string res_1 = res_iden;         // 取得表达式的值
+    int switch_end_id = label_cnt++; // end_labid和上面的res_1要作为参数传进去
     if (NOWSYM != RPARENT)
     {
         add_error(NOWLINE, NO_RPARENT);
@@ -1419,7 +1575,7 @@ bool GrammaAna::switch_check()
     }
     sym_index++;
 
-    condition_table(typee);
+    condition_table(typee, res_1, switch_end_id);
     if (NOWSYM != DEFAULTTK)
     {
         add_error(NOWLINE, NO_DEFAULT);
@@ -1432,6 +1588,7 @@ bool GrammaAna::switch_check()
         return 0;
     }
     sym_index++;
+    interCode.emplace_back("set_lab", lab_to_str(switch_end_id) + ":", "", "");
 
     GRAOUT;
     cout << "<情况语句>" << endl;
@@ -1469,6 +1626,8 @@ bool GrammaAna::callFuncNoRet_check()
     }
     else
         sym_index++;
+
+    interCode.emplace_back("call", tem_sym.name, "", "");
 
     GRAOUT;
     cout << "<无返回值函数调用语句>" << endl;
@@ -1508,6 +1667,9 @@ int GrammaAna::callFuncRet_check()
     }
     else
         sym_index++;
+
+    interCode.emplace_back("call", tem_sym.name, "", "");
+
     GRAOUT;
     cout << "<有返回值函数调用语句>" << endl;
 #ifndef ERROR_HANDLAR
@@ -1522,8 +1684,10 @@ int GrammaAna::callFuncRet_check()
 bool GrammaAna::value_para_list(const vector<TYPE_NAME> &real_para)
 {
     //参数表为空的几种可能情况，由于可能缺少右括号，情况变复杂了
+    vector<string> tem_para;
     if (NOWSYM == RPARENT or NOWSYM == SEMICN or NOWSYM == MULT or NOWSYM == DIV)
     {
+        interCode.emplace_back("save_reg", "", "", ""); // 为空的时候也要save
         if (real_para.size() != 0)
         {
             add_error(NOWLINE, PARA_NUM_NOT_MATCH);
@@ -1537,6 +1701,7 @@ bool GrammaAna::value_para_list(const vector<TYPE_NAME> &real_para)
     }
     int typee, para_num = 1, limit_num = real_para.size();
     typee = expre_check();
+    tem_para.push_back(res_iden); //压入临时的参数栈
     if (para_num > limit_num)
     {
         add_error(NOWLINE, PARA_NUM_NOT_MATCH);
@@ -1550,6 +1715,7 @@ bool GrammaAna::value_para_list(const vector<TYPE_NAME> &real_para)
     {
         sym_index++;
         typee = expre_check();
+        tem_para.push_back(res_iden); //压入临时参数栈
         para_num++;
         if (para_num > limit_num)
         {
@@ -1561,6 +1727,12 @@ bool GrammaAna::value_para_list(const vector<TYPE_NAME> &real_para)
         }
     }
 
+    interCode.emplace_back("save_reg", "", "", "");
+    for (string &strr : tem_para)
+    { //整体搞一个
+        interCode.emplace_back("push_para", strr, "", "");
+    }
+
     GRAOUT;
     cout << "<值参数表>" << endl;
 #ifndef ERROR_HANDLAR
@@ -1569,15 +1741,13 @@ bool GrammaAna::value_para_list(const vector<TYPE_NAME> &real_para)
     return 1;
 }
 
-bool all_numm(string& s)
-{
-    for (char a : s)
-        if (!isdigit(a))
-            return false;
-    return true;
-}
-
-
+// bool all_numm(string &s)
+// {
+//     for (char a : s)
+//         if (!isdigit(a))
+//             return false;
+//     return true;
+// }
 
 /*
 ＜赋值语句＞   ::=  
@@ -1597,8 +1767,8 @@ bool GrammaAna::assign_check()
     if (NOWSYM != IDENFR)
         ERROR_
     string var_name = NOWSTR;
-    IDENFR_EXIST_CONST_CHECK
-    sym_index++;
+    IDENFR_EXIST_CONST_CHECK //id_sym保存了对应的符号表
+        sym_index++;
 
     if (NOWSYM == ASSIGN) //变量
     {
@@ -1609,13 +1779,16 @@ bool GrammaAna::assign_check()
         //if (NOW_SYMTAB.find(jklh) == NOW_SYMTAB.end())
         //    if (sym_table_stk[0].find(jklh) == sym_table_stk[0].end() and !all_numm(res_iden))
         //        exit(0);
-
     }
     else if (NOWSYM == LBRACK)
     {
+        int dem1 = id_sym->dimen_size[0];
+        int dem2 = id_sym->dimen_size[1];
+
         sym_index++;
         int typee;
         typee = expre_check();
+        string res_1 = res_iden; //数组第一维的信息
         if (typee == 2)
         {
             add_error(NOWLINE, INDEX_ERR);
@@ -1630,11 +1803,16 @@ bool GrammaAna::assign_check()
         {
             sym_index++;
             expre_check();
+            string right_expr = res_iden;
+            string tem_var2 = get_temvar();
+            interCode.emplace_back("*", res_1, "4", tem_var2);
+            interCode.emplace_back("save_arr_val", id_sym->name, tem_var2, right_expr);
         }
         else if (NOWSYM == LBRACK) //二维数组
         {
             sym_index++;
             typee = expre_check();
+            string res_2 = res_iden;
             if (typee == 2)
             {
                 add_error(NOWLINE, INDEX_ERR);
@@ -1649,6 +1827,13 @@ bool GrammaAna::assign_check()
                 ERROR_
             sym_index++;
             expre_check();
+            string right_expr = res_iden;
+            string tem_var1 = get_temvar();
+            string tem_var2 = get_temvar();
+            interCode.emplace_back("*", res_1, to_string(dem2), tem_var1);
+            interCode.emplace_back("+", tem_var1, res_2, tem_var2);
+            interCode.emplace_back("*", tem_var2, "4", tem_var2);
+            interCode.emplace_back("save_arr_val", id_sym->name, tem_var2, right_expr);
         }
     }
 #undef ERROR_
@@ -1742,9 +1927,15 @@ int GrammaAna::sentence_check(int flag)
         if (PEEKSYM(1) == LPARENT)
         {
             if (noRetFunc_symSet.find(NOWSTR) != noRetFunc_symSet.end())
+            {
                 callFuncNoRet_check();
+                interCode.emplace_back("load_reg", "", "", "");
+            }
             else
+            {
                 callFuncRet_check();
+                interCode.emplace_back("load_reg", "", "", "");
+            }
         }
         else
             assign_check();
@@ -1808,6 +1999,7 @@ int GrammaAna::mult_sentence(int flag)
 bool GrammaAna::func_noRet_define()
 {
     string func_name;
+
     ret_in_func = 0;
     need_ret_type = 0;
     int name_line = 0;
@@ -1817,6 +2009,8 @@ bool GrammaAna::func_noRet_define()
         return 0;
     }
     sym_index++;
+    interCode.emplace_back("func", NOWSTR, "", "");
+    now_addr_offset = 0;
     if (NOWSYM != IDENFR)
     {
         cout << "Error in func func_noRet_def" << endl;
@@ -1861,6 +2055,9 @@ bool GrammaAna::func_noRet_define()
     }
     sym_index++;
     mult_sentence(0); // 复合语句
+
+    interCode.emplace_back("return", "", "", "");
+
     if (NOWSYM != RBRACE)
     {
         cout << "Error in func func_noRet_def" << endl;
@@ -1868,9 +2065,12 @@ bool GrammaAna::func_noRet_define()
     }
     sym_index++;
 
+    tem_sym.tot_memory = now_addr_offset;
+    sym_table_stk[sym_table_stk.size() - 2].erase(tem_sym); //删除之前的那个没有更新totMem的
+    sym_table_stk[sym_table_stk.size() - 2].insert(tem_sym);
+
     running_symtable.emplace_back(func_name, sym_table_stk[sym_table_stk.size() - 1]);
     POP_SYMSTK;
-
     GRAOUT;
     cout << "<无返回值函数定义>" << endl;
 #ifndef ERROR_HANDLAR
@@ -1919,6 +2119,8 @@ bool GrammaAna::func_define()
     name_line = NOWLINE;
     Symble_item tem_sym = Symble_item(NOWSTR, FUNC, typee == 1 ? INT : CHAR);
     string func_name = NOWSTR; //记录函数名字
+    now_addr_offset = 0;       // 新增的部分
+    interCode.emplace_back("func", NOWSTR, "", "");
     sym_index--;
     statment_head();
 
@@ -1964,6 +2166,11 @@ bool GrammaAna::func_define()
         return 0;
     }
     sym_index++;
+
+    tem_sym.tot_memory = now_addr_offset;
+    sym_table_stk[sym_table_stk.size() - 2].erase(tem_sym); //删除之前的那个没有更新totMem的
+    sym_table_stk[sym_table_stk.size() - 2].insert(tem_sym);
+
     running_symtable.emplace_back(func_name, sym_table_stk[sym_table_stk.size() - 1]); //在pop之前加入运行符号表
     POP_SYMSTK;
 
@@ -2014,7 +2221,7 @@ bool GrammaAna::main_define()
 
     mult_sentence(0);
 
-    interCode.emplace_back("ret_void","","","");
+    interCode.emplace_back("return", "", "", "");
 
     if (NOWSYM != RBRACE) // {
         ERROR_
@@ -2041,7 +2248,7 @@ bool GrammaAna::main_define()
 */
 bool GrammaAna::top_programe()
 {
-    NEW_SYMSTK;
+    NEW_SYMSTK; //全局符号表
     //常量定义
     if (NOWSYM == CONSTTK)
         if (!const_stat())
@@ -2076,7 +2283,7 @@ bool GrammaAna::top_programe()
         }
     }
     main_define();
-    running_symtable.emplace_back("#global", sym_table_stk[sym_table_stk.size() - 1]); //全局符号表
+    running_symtable.emplace_back("global", sym_table_stk[sym_table_stk.size() - 1]); //全局符号表
     POP_SYMSTK;
 
     GRAOUT;
