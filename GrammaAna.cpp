@@ -763,7 +763,8 @@ bool GrammaAna::condition_check(int label_id) // 这里的表情直接拿全局�
     }
 
     string tem_var = get_temvar();
-    interCode.emplace_back("-", res, res2, tem_var);                    //临时变量储存相减的值
+    interCode.emplace_back("-", res, res2, tem_var);
+    //临时变量储存相减的值
     interCode.emplace_back(rela_op, tem_var, "", lab_to_str(label_id)); // 这是跳转到结束的label
 
     GRAOUT;

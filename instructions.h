@@ -29,3 +29,5 @@ void bgtz(string tar, string reg1);
 void bgez(string tar, string reg1);
 void blez(string tar, string reg1);
 void bltz(string tar, string reg1);
+void sll(string dst, string op1, string op2);
+void sra(string dst, string op1, string op2);

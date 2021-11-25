@@ -141,8 +141,112 @@ inline void debug_in_symTab_interCode()
     symtablefile.close();
 }
 
+inline void opt_sll_sra()
+{
+    for (int i = 0; i < (int)interCode.size(); i++)
+    {
+        Inter& inter = interCode[i];
+        if (inter.op == "*") {
+            int id1 = -1, id2 = -1;
+            int flag[2] = { 0,0 };
+            if (check_str_is_int(inter.iden1))
+            {
+                id1 = stoi(inter.iden1);
+                flag[0] = 1;
+            }
+            if (check_str_is_int(inter.iden2))
+            {
+                id2 = stoi(inter.iden2);
+                flag[1] = 1;
+            }
+            if (flag[0] * flag[1] == 1)
+            {
+                interCode[i].op = "=_const";
+                interCode[i].iden1 = to_string(id1 * id2);
+                continue;
+            }
+            if (flag[1] == 1)
+            {
+                swap(interCode[i].iden1, interCode[i].iden2);
+                swap(flag[0], flag[1]);
+                swap(id1, id2);
+            }
+            if (flag[0] == 1)
+            {
+                int two = 0;
+                int temid = id1;
+                int tem_cnt = 0;
+                while (temid > 0)
+                {
+                    if ((temid & 1) == 1)
+                        tem_cnt++;
+                    two++;
+                    temid >>= 1;
+                }
+                if (id1 == 0)
+                {
+                    interCode[i].op = "=_const";
+                    interCode[i].iden1 = to_string(0);
+                }
+                else if (id1 > 0 and tem_cnt == 1)
+                {
+                    two--;
+                    interCode[i].op = "<<";
+                    interCode[i].iden1 = interCode[i].iden2;
+                    interCode[i].iden2 = to_string(two);
+                }
+            }
+        }
+        /*else if (inter.op == "/") {
+            int id1 = -1, id2 = -1;
+            int flag[2] = { 0,0 };
+            if (check_str_is_int(inter.iden1))
+            {
+                id1 = stoi(inter.iden1);
+                flag[0] = 1;
+            }
+            if (check_str_is_int(inter.iden2))
+            {
+                id2 = stoi(inter.iden2);
+                flag[1] = 1;
+            }
+            if (flag[0] * flag[1] == 1)
+            {
+                interCode[i].op = "=_const";
+                interCode[i].iden1 = to_string(id1 / id2);
+                continue;
+            }
+            if (flag[1] == 1)
+            {
+                int two = 0;
+                int temid = id2;
+                int tem_cnt = 0;
+                while (temid > 0)
+                {
+                    if ((temid & 1) == 1)
+                        tem_cnt++;
+                    two++;
+                    temid >>= 1;
+                }
+                if (id2 > 0 and tem_cnt == 1)
+                {
+                    two--;
+                    interCode[i].op = ">>";
+                    //interCode[i].iden1 = interCode[i].iden2;
+                    interCode[i].iden2 = to_string(two);
+                }
+            }
+        }*/
+    }
+}
+
 void start_inter2mips()
 {
+    ofstream innnn("intercode_ori.txt");
+    for (int i = 0; i < (int)interCode.size(); i++)
+        interCode[i].out(innnn);
+    innnn.close();
+    opt_sll_sra();
     debug_in_symTab_interCode();
     init();
     //syscall(10);
@@ -438,6 +542,18 @@ void inter2mips(int index)
             load_from_mem(now_code.iden2, "$t1");
             beq(now_code.tar, "$t0", "$t1");
         }
+    }
+    else if (now_code.op == "<<")
+    {
+        load_from_mem(now_code.iden1, "$t0");
+        sll("$t1", "$t0", now_code.iden2);
+        store_to_mem(now_code.tar, "$t1");
+    }
+    else if (now_code.op == ">>")
+    {
+        load_from_mem(now_code.iden1, "$t0");
+        sra("$t1", "$t0", now_code.iden2);
+        store_to_mem(now_code.tar, "$t1");
     }
     mipsfile << "#---------" << now_code.op << "," << now_code.iden1 << "," << now_code.iden2 << "," << now_code.tar << endl;
 }

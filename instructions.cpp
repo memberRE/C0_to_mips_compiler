@@ -154,3 +154,13 @@ void div(string dst, string op1, string op2)
     mipsfile << "div " << op1 << ", " << op2 << endl;
     mipsfile << "mflo " << dst << endl;
 }
+
+void sll(string dst, string op1, string op2)
+{
+    mipsfile << "sll " << dst << ", " << op1 << ", " << op2 << endl;
+}
+
+void sra(string dst, string op1, string op2)
+{
+    mipsfile << "sra " << dst << ", " << op1 << ", " << op2 << endl;
+}
